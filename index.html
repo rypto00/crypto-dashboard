@@ -496,15 +496,10 @@
                     <option value="BSC">BSC</option>
                     <option value="Polygon">Polygon</option>
                 </select>
-                <input type="text" id="tokenInput" placeholder="토큰 컨트랙트 주소 (0x...)">
+                <input type="text" id="tokenInput" placeholder="토큰 컨트랙트 주소 (0x...) 또는 ETH/BNB/MATIC">
                 <button id="searchBtn" onclick="searchToken()">🔍 조회</button>
             </div>
-            <div style="margin-top: 15px;">
-                <label><strong>⚡ 빠른 검색:</strong></label>
-                <div class="native-token-buttons" id="nativeButtons">
-                    <button class="native-btn" onclick="searchNativeToken()">ETH 조회</button>
-                </div>
-            </div>
+
         </div>
 
         <!-- 상세 진행 상태 -->
@@ -791,23 +786,31 @@
             return colors[Math.floor(Math.random() * colors.length)];
         }
 
-        // 🔥 Firebase 초기화
+        // 🔥 Firebase 초기화 (개선된 오류 처리)
         async function initializeFirebase() {
             try {
-                // Firebase 설정 확인
-                if (firebaseConfig.apiKey === "YOUR_API_KEY") {
-                    console.log('🔥 Firebase 설정이 필요합니다. 로컬 모드로 실행됩니다.');
-                    document.getElementById('firebaseGuide').style.display = 'block';
-                    return false;
-                }
-
+                console.log('🔥 Firebase 초기화 시도 중...');
+                
                 const app = firebase.initializeApp(firebaseConfig);
                 database = firebase.database();
-                console.log('🔥 Firebase 초기화 완료');
+                
+                // 연결 테스트
+                await database.ref('.info/connected').once('value');
+                
+                console.log('🔥 Firebase 초기화 및 연결 테스트 완료');
+                showMessage('success', '🔥 Firebase 클라우드 연결 성공!');
                 return true;
             } catch (error) {
                 console.error('Firebase 초기화 실패:', error);
-                showMessage('warning', 'Firebase 연결 실패. 로컬 모드로 실행됩니다.');
+                console.error('오류 상세:', error.message);
+                
+                if (error.message.includes('permission')) {
+                    showMessage('error', 'Firebase 권한 오류. Database 규칙을 확인하세요.');
+                } else if (error.message.includes('network')) {
+                    showMessage('error', '네트워크 연결을 확인하세요.');
+                } else {
+                    showMessage('warning', 'Firebase 연결 실패. 로컬 모드로 실행됩니다.');
+                }
                 return false;
             }
         }
@@ -842,19 +845,27 @@
             }
         }
 
-        // 💾 지갑 데이터 저장
+        // 💾 지갑 데이터 저장 (개선된 오류 처리)
         async function saveWallets() {
             try {
                 if (database) {
+                    console.log('💾 Firebase에 지갑 데이터 저장 시도...');
                     await database.ref('wallets').set(wallets);
-                    console.log('🔥 Firebase에 지갑 데이터 저장됨');
+                    console.log('✅ Firebase에 지갑 데이터 저장 완료');
                     return true;
                 } else {
                     console.log('📁 로컬 모드: Firebase 저장 건너뜀');
                     return false;
                 }
             } catch (error) {
-                console.error('Firebase 저장 실패:', error);
+                console.error('❌ Firebase 저장 실패:', error);
+                console.error('오류 상세:', error.message);
+                
+                if (error.message.includes('permission') || error.message.includes('PERMISSION_DENIED')) {
+                    showMessage('error', '❌ Firebase 권한 오류! Database 규칙에서 write: true로 설정하세요.');
+                } else {
+                    showMessage('error', `❌ Firebase 저장 실패: ${error.message}`);
+                }
                 return false;
             }
         }
@@ -899,7 +910,7 @@
             }
         }
 
-        // 🪙 토큰 정보 조회
+        // 🪙 토큰 정보 조회 (소수점 정확도 개선)
         async function getTokenInfo(tokenAddress) {
             try {
                 updateProgressStep('step2', 'active', '2. 토큰 정보 조회 중...');
@@ -916,23 +927,51 @@
                     return result;
                 }
 
+                console.log(`🔍 토큰 컨트랙트 조회: ${tokenAddress}`);
                 const contract = new web3.eth.Contract(ERC20_ABI, tokenAddress);
                 
-                const [name, symbol, decimals] = await Promise.all([
-                    contract.methods.name().call().catch(() => 'Unknown'),
-                    contract.methods.symbol().call().catch(() => 'UNKNOWN'),
-                    contract.methods.decimals().call().catch(() => 18)
-                ]);
+                // 각각 개별적으로 조회해서 오류 원인 파악
+                let name = 'Unknown';
+                let symbol = 'UNKNOWN';
+                let decimals = 18;
+                
+                try {
+                    name = await contract.methods.name().call();
+                    console.log(`📛 토큰 이름: ${name}`);
+                } catch (e) {
+                    console.warn('토큰 이름 조회 실패:', e.message);
+                }
+                
+                try {
+                    symbol = await contract.methods.symbol().call();
+                    console.log(`🔤 토큰 심볼: ${symbol}`);
+                } catch (e) {
+                    console.warn('토큰 심볼 조회 실패:', e.message);
+                }
+                
+                try {
+                    decimals = await contract.methods.decimals().call();
+                    decimals = parseInt(decimals);
+                    console.log(`🔢 토큰 소수점: ${decimals}`);
+                } catch (e) {
+                    console.warn('토큰 소수점 조회 실패, 기본값 18 사용:', e.message);
+                    decimals = 18;
+                }
 
                 updateProgressStep('step2', 'completed', '2. 토큰 정보 조회 완료');
                 
-                return {
+                const result = {
                     name: name || 'Unknown',
                     symbol: symbol || 'UNKNOWN',
-                    decimals: parseInt(decimals) || 18
+                    decimals: decimals
                 };
+                
+                console.log('📋 최종 토큰 정보:', result);
+                return result;
+                
             } catch (error) {
                 updateProgressStep('step2', 'error', '2. 토큰 정보 조회 실패');
+                console.error('토큰 정보 조회 전체 실패:', error);
                 throw new Error(`토큰 정보 조회 실패: ${error.message}`);
             }
         }
