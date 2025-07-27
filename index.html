@@ -6,6 +6,9 @@
     <title>🔥 RPC 기반 핫월렛 토큰 대시보드</title>
     <script src="https://cdn.jsdelivr.net/npm/web3@1.10.0/dist/web3.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
     <style>
         * {
             margin: 0;
@@ -202,7 +205,8 @@
         }
 
         th:nth-child(4), td:nth-child(4) {
-            width: 150px;
+            width: 200px;
+            min-width: 200px;
         }
 
         th {
@@ -517,8 +521,54 @@
     </div>
 
     <script>
-        // 로컬 스토리지에서 지갑 정보 관리
-        let wallets = JSON.parse(localStorage.getItem('exchangeWallets') || '{}');
+        // Firebase 설정
+        const firebaseConfig = {
+            apiKey: "AIzaSyB8OcOZ5uNPy6fqCfLHqM7IJUb2dHfxP6g",
+            authDomain: "crypto-dashboard-a5a64.firebaseapp.com",
+            databaseURL: "https://crypto-dashboard-a5a64-default-rtdb.firebaseio.com",
+            projectId: "crypto-dashboard-a5a64",
+            storageBucket: "crypto-dashboard-a5a64.firebasestorage.app",
+            messagingSenderId: "952139620608",
+            appId: "1:952139620608:web:a9c3291493e78660a653e5"
+        };
+
+        // Firebase 초기화
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        // 지갑 관리 (Firebase 연동)
+        let wallets = {};
+        
+        // 기본 지갑들 (실제 거래소 핫월렛 주소)
+        const defaultWallets = {
+            "ETH": {
+                "Binance_Hot1": "0x28C6c06298d514Db089934071355E5743bf21d60",
+                "Binance_Hot2": "0x21a31Ee1afC51d94C2eFcCAa2092aD1028285549",
+                "Binance_Hot3": "0xDFd5293D8e347dFe59E90eFd55b2956a1343963d",
+                "Binance_Hot4": "0xF977814e90dA44bFA03b6295A0616a897441aceC",
+                "OKX_Hot1": "0x98EC059Dc3aDFBdd63429454aEB0c990FBA4A128",
+                "OKX_Hot2": "0x06959153B974D0D5fDfd87D561db6d8d4FA0910b",
+                "KuCoin_Hot": "0xd6216fc19db775df9774a6e33526131da7d19a2c",
+                "KuCoin_Hot2": "0xeb2629a2734e272Bcc07BDA959863f316F4bD4Cf",
+                "Bybit_Hot": "0xf89d7b9c864f589bbF53a82105107622B35EaA40",
+                "Gate.io_Hot": "0x0D0707963952f2fBA59dD06f2b425ace40b492Fe",
+                "Gate.io_Hot2": "0x1C4b70a3968436B9A0a9cf5205c787eb81Bb558c",
+                "MEXC_Hot": "0x75e89d5979e4f6fba9f97c104c2f0afb3f1dcb88",
+                "Bitget_Hot": "0x5bdf85216ec1e38d6458c870992a69e38e03f7ef",
+                "Crypto.com_Hot": "0x6262998Ced04146fA42253a5C0AF90CA02dfd2A3",
+                "Huobi_Hot": "0xE93381fB4c4F14bDa253907b18faD305D799241a"
+            },
+            "BSC": {
+                "Binance_BSC": "0x8894E0a0c962CB723c1976a4421c95949bE2D4E3",
+                "Gate.io_BSC": "0x1C4b70a3968436B9A0a9cf5205c787eb81Bb558c",
+                "KuCoin_BSC": "0xEB2d2F1b8c558a40207669291Fda468E50c8A0bB",
+                "MEXC_BSC": "0x4982085C9e2F89F2eCb8131Eca71aFAD896e89CB"
+            },
+            "Polygon": {
+                "Binance_Polygon": "0xe7804c37c13166fF0b37F5aE0BB07A3aEbb6e245",
+                "OKX_Polygon": "0xAA58D356B49C909Ce69c64318E7f8f97E3E9D616"
+            }
+        };
         
         // 기본 지갑들 (실제 거래소 핫월렛 주소)
         const defaultWallets = {
@@ -551,10 +601,43 @@
             }
         };
 
-        // 초기화 - 기존 지갑이 없을 때만 기본값 사용
-        if (Object.keys(wallets).length === 0) {
-            wallets = defaultWallets;
-            localStorage.setItem('exchangeWallets', JSON.stringify(wallets));
+        // Firebase에서 지갑 데이터 로드
+        async function loadWalletsFromFirebase() {
+            try {
+                const snapshot = await database.ref('wallets').once('value');
+                const firebaseWallets = snapshot.val();
+                
+                if (firebaseWallets) {
+                    wallets = firebaseWallets;
+                    console.log('🔥 Firebase에서 지갑 데이터 로드됨:', Object.keys(wallets));
+                } else {
+                    // Firebase에 데이터가 없으면 기본 지갑으로 초기화
+                    wallets = defaultWallets;
+                    await saveWalletsToFirebase();
+                    console.log('🔥 기본 지갑 데이터를 Firebase에 저장함');
+                }
+                
+                displayWallets();
+            } catch (error) {
+                console.error('Firebase 로드 실패:', error);
+                // Firebase 실패시 로컬 스토리지 사용
+                wallets = JSON.parse(localStorage.getItem('exchangeWallets') || JSON.stringify(defaultWallets));
+                displayWallets();
+            }
+        }
+
+        // Firebase에 지갑 데이터 저장
+        async function saveWalletsToFirebase() {
+            try {
+                await database.ref('wallets').set(wallets);
+                console.log('🔥 Firebase에 지갑 데이터 저장됨');
+                // 백업으로 로컬 스토리지에도 저장
+                localStorage.setItem('exchangeWallets', JSON.stringify(wallets));
+            } catch (error) {
+                console.error('Firebase 저장 실패:', error);
+                // Firebase 실패시 로컬 스토리지만 사용
+                localStorage.setItem('exchangeWallets', JSON.stringify(wallets));
+            }
         }
         
         // 각 체인에 빈 객체 보장
@@ -667,8 +750,8 @@
             return null;
         }
 
-        // 지갑 추가
-        function addWallet() {
+        // 지갑 추가 (Firebase 연동)
+        async function addWallet() {
             const chain = document.getElementById('walletChain').value;
             const name = document.getElementById('walletName').value.trim();
             let address = document.getElementById('walletAddress').value.trim();
@@ -718,8 +801,8 @@
             // 지갑 추가
             wallets[chain][name] = address;
             
-            // 로컬스토리지에 저장
-            localStorage.setItem('exchangeWallets', JSON.stringify(wallets));
+            // Firebase에 저장
+            await saveWalletsToFirebase();
             
             // 목록 새로고침
             displayWallets();
@@ -728,15 +811,19 @@
             document.getElementById('walletName').value = '';
             document.getElementById('walletAddress').value = '';
             
-            alert(`${chain} 체인에 ${name} 지갑이 추가되었습니다.`);
+            alert(`🔥 ${chain} 체인에 ${name} 지갑이 추가되었습니다! (Firebase 동기화됨)`);
         }
 
-        // 지갑 삭제
-        function deleteWallet(chain, name) {
+        // 지갑 삭제 (Firebase 연동)
+        async function deleteWallet(chain, name) {
             if (confirm(`${chain} - ${name} 지갑을 삭제하시겠습니까?`)) {
                 delete wallets[chain][name];
-                localStorage.setItem('exchangeWallets', JSON.stringify(wallets));
+                
+                // Firebase에 저장
+                await saveWalletsToFirebase();
+                
                 displayWallets();
+                alert('🔥 지갑이 삭제되었습니다! (Firebase 동기화됨)');
             }
         }
 
@@ -1157,10 +1244,14 @@
             }
         });
 
-        // 페이지 로드시 초기화
-        window.onload = function() {
-            displayWallets();
-            console.log('🚀 RPC 기반 대시보드 준비 완료 - Alchemy 연결됨');
+        // 페이지 로드시 초기화 (Firebase 연동)
+        window.onload = async function() {
+            console.log('🚀 RPC 기반 대시보드 시작 - Firebase 연결 중...');
+            
+            // Firebase에서 지갑 데이터 로드
+            await loadWalletsFromFirebase();
+            
+            console.log('🔥 Firebase 연결 완료 - Alchemy RPC 준비됨');
         };
     </script>
 </body>
