@@ -60,6 +60,9 @@
 
         .chain-selector {
             position: relative;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
 
         .chain-dropdown {
@@ -77,6 +80,27 @@
         .chain-dropdown:focus {
             border-color: #4CAF50;
             outline: none;
+        }
+
+        .chain-settings-btn {
+            background: #3b4252;
+            border: none;
+            padding: 8px;
+            border-radius: 6px;
+            cursor: pointer;
+            color: #aaa;
+            font-size: 16px;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+        }
+
+        .chain-settings-btn:hover {
+            background: #4c5565;
+            color: #fff;
         }
 
         .search-mode-select {
@@ -542,6 +566,9 @@
                     <select id="mainChainSelect" class="chain-dropdown" onchange="handleChainChange()">
                         <!-- 동적으로 생성 -->
                     </select>
+                    <button class="chain-settings-btn" onclick="openChainModal()" title="체인 추가">
+                        ⚙️
+                    </button>
                 </div>
                 <div>
                     <label style="font-size: 12px; color: #aaa; margin-right: 8px;">모드:</label>
@@ -837,7 +864,7 @@
             appId: "1:952139620608:web:a9c3291493e78660a653e5"
         };
 
-        // 🔄 메인 체인 드롭다운 업데이트
+        // 🔄 메인 체인 드롭다운 업데이트 (톱니바퀴 분리)
         function updateMainChainDropdown() {
             const mainChainSelect = document.getElementById('mainChainSelect');
             if (!mainChainSelect) return;
@@ -870,38 +897,23 @@
                 });
             }
             
-            // 구분선 및 추가 옵션
-            const separator2 = document.createElement('option');
-            separator2.disabled = true;
-            separator2.textContent = '──────────────';
-            mainChainSelect.appendChild(separator2);
-            
-            const addOption = document.createElement('option');
-            addOption.value = 'ADD_NEW';
-            addOption.textContent = '⚙️ 새 체인 추가';
-            mainChainSelect.appendChild(addOption);
-            
             // 현재 선택된 체인 유지
             if (currentChain && allChains[currentChain]) {
                 mainChainSelect.value = currentChain;
+            } else {
+                // 기본값 설정
+                currentChain = 'ETH';
+                mainChainSelect.value = 'ETH';
             }
         }
 
-        // 🔄 체인 변경 처리
+        // 🔄 체인 변경 처리 (단순화)
         function handleChainChange() {
             const mainChainSelect = document.getElementById('mainChainSelect');
             const selectedValue = mainChainSelect.value;
             
-            if (selectedValue === 'ADD_NEW') {
-                // 체인 추가 모달 열기
-                openChainModal();
-                // 이전 선택값으로 복원
-                mainChainSelect.value = currentChain;
-            } else {
-                // 일반 체인 선택
-                currentChain = selectedValue;
-                console.log(`체인 변경됨: ${selectedValue}`);
-            }
+            currentChain = selectedValue;
+            console.log(`체인 변경됨: ${selectedValue}`);
         }
 
         // 🔧 체인 추가 모달 관리
@@ -1939,8 +1951,10 @@
             }
         }
 
-        // 🚀 메인 검색 함수 (헤더 기반)
+        // 🚀 메인 검색 함수 (디버깅 추가)
         async function searchToken() {
+            console.log('🔍 검색 함수 호출됨');
+            
             if (isSearching) {
                 showMessage('warning', '이미 검색 중입니다. 잠시만 기다려주세요.');
                 return;
@@ -1948,6 +1962,8 @@
             
             const searchMode = document.getElementById('searchModeSelect').value;
             const input = document.getElementById('tokenInput').value.trim();
+            
+            console.log('📋 입력값:', {searchMode, input, currentChain});
             
             if (!input) {
                 showMessage('error', '토큰 주소를 입력하세요.');
@@ -1967,61 +1983,78 @@
             let tokenAddress = input;
             const isMultiChain = searchMode === 'multi';
             
+            console.log('🎯 검색 모드:', isMultiChain ? '멀티체인' : '단일체인');
+            
             // 네이티브 토큰 처리 (동적 체인 지원)
             if (!input.startsWith('0x')) {
+                console.log('💰 네이티브 토큰 처리 시도');
                 const allChains = getAllChains();
                 let isNative = false;
                 
                 if (isMultiChain) {
                     // 멀티체인에서는 모든 체인의 네이티브 토큰 허용
                     const allNativeSymbols = Object.values(allChains).map(chain => chain.symbol.toUpperCase());
+                    console.log('🌐 멀티체인 네이티브 심볼들:', allNativeSymbols);
                     if (allNativeSymbols.includes(input.toUpperCase())) {
                         tokenAddress = '0x0000000000000000000000000000000000000000';
                         isNative = true;
+                        console.log('✅ 네이티브 토큰 인식됨');
                     }
                 } else {
                     // 단일 체인에서는 현재 선택된 체인의 네이티브 토큰만 허용
                     const chainInfo = allChains[currentChain];
+                    console.log('🔗 현재 체인 정보:', chainInfo);
                     if (chainInfo && chainInfo.symbol.toUpperCase() === input.toUpperCase()) {
                         tokenAddress = '0x0000000000000000000000000000000000000000';
                         isNative = true;
+                        console.log('✅ 단일체인 네이티브 토큰 인식됨');
                     }
                 }
                 
                 if (!isNative) {
+                    console.log('❌ 네이티브 토큰 인식 실패');
                     showMessage('error', `${input} 토큰의 컨트랙트 주소를 직접 입력하세요.`);
                     isSearching = false;
                     document.getElementById('searchBtn').disabled = false;
                     document.getElementById('detailedProgress').style.display = 'none';
                     return;
                 }
+            } else {
+                console.log('📄 컨트랙트 주소 입력됨:', tokenAddress);
             }
             
             try {
                 const allChains = getAllChains();
                 const connectChain = isMultiChain ? Object.keys(allChains)[0] : currentChain;
                 
-                console.log(`🚀 ${isMultiChain ? '멀티체인' : allChains[currentChain]?.name} 모드로 ${tokenAddress} 검색 시작`);
+                console.log(`🚀 검색 시작: ${isMultiChain ? '멀티체인' : allChains[currentChain]?.name} 모드, 연결체인: ${connectChain}`);
                 
                 // 1. 블록체인 연결
+                console.log('🔗 블록체인 연결 시도...');
                 await connectToChain(connectChain);
+                console.log('✅ 블록체인 연결 완료');
                 
                 // 2. 토큰 정보와 가격 정보 병렬로 가져오기
+                console.log('📋 토큰 정보 및 가격 조회 시작...');
                 const [tokenInfo, priceInfo] = await Promise.all([
                     getTokenInfo(tokenAddress),
                     getTokenPrice(tokenAddress, connectChain)
                 ]);
+                console.log('📋 토큰 정보:', tokenInfo);
+                console.log('💰 가격 정보:', priceInfo);
                 
                 // 토큰 정보 표시
                 displayTokenInfo(tokenInfo, tokenAddress);
                 displayPriceInfo(priceInfo);
                 
                 // 3. 슈퍼 병렬 잔고 조회
+                console.log('💳 지갑 잔고 조회 시작...');
                 const balances = await getSuperParallelBalances(
                     tokenAddress, 
                     tokenInfo, 
                     isMultiChain
                 );
+                console.log('💳 최종 잔고 결과:', balances);
                 
                 // 결과 표시
                 displayBalances(balances, priceInfo ? priceInfo.price : 0);
@@ -2031,8 +2064,10 @@
                     document.getElementById('detailedProgress').style.display = 'none';
                 }, 3000);
                 
+                console.log('🎉 검색 완료!');
+                
             } catch (error) {
-                console.error('검색 오류:', error);
+                console.error('❌ 검색 오류:', error);
                 
                 let errorMessage = '알 수 없는 오류가 발생했습니다.';
                 
@@ -2051,6 +2086,7 @@
             } finally {
                 isSearching = false;
                 document.getElementById('searchBtn').disabled = false;
+                console.log('🔄 검색 상태 초기화 완료');
             }
         }
 
