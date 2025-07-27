@@ -1,4 +1,11 @@
-<!DOCTYPE html>
+// 각 체인에 빈 객체 보장
+        function ensureChainWallets() {
+            ['ETH', 'BSC', 'Polygon'].forEach(chain => {
+                if (!wallets[chain]) {
+                    wallets[chain] = {};
+                }
+            });
+        }<!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
@@ -205,8 +212,8 @@
         }
 
         th:nth-child(4), td:nth-child(4) {
-            width: 200px;
-            min-width: 200px;
+            width: 250px;
+            min-width: 250px;
         }
 
         th {
@@ -359,8 +366,7 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>🔥 RPC 기반 핫월렛 토큰 대시보드</h1>
-            <p>Alchemy RPC | 100% 정확한 데이터</p>
+            <h1>🔥 핫월렛 토큰 대시보드</h1>
         </div>
 
         <!-- 검색 섹션 -->
@@ -617,11 +623,13 @@
                     console.log('🔥 기본 지갑 데이터를 Firebase에 저장함');
                 }
                 
+                ensureChainWallets();
                 displayWallets();
             } catch (error) {
                 console.error('Firebase 로드 실패:', error);
-                // Firebase 실패시 로컬 스토리지 사용
-                wallets = JSON.parse(localStorage.getItem('exchangeWallets') || JSON.stringify(defaultWallets));
+                // Firebase 실패시 기본 지갑 사용
+                wallets = defaultWallets;
+                ensureChainWallets();
                 displayWallets();
             }
         }
