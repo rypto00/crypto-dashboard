@@ -1,11 +1,4 @@
-// 각 체인에 빈 객체 보장
-        function ensureChainWallets() {
-            ['ETH', 'BSC', 'Polygon'].forEach(chain => {
-                if (!wallets[chain]) {
-                    wallets[chain] = {};
-                }
-            });
-        }<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
@@ -61,6 +54,27 @@
             flex-wrap: wrap;
         }
 
+        .native-token-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .native-btn {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .native-btn:hover {
+            background: #45a049;
+        }
+
         select {
             background: #1a1f2e;
             color: white;
@@ -95,6 +109,11 @@
 
         button:hover {
             background: #4c5565;
+        }
+
+        button:disabled {
+            background: #666;
+            cursor: not-allowed;
         }
 
         .info-grid {
@@ -329,6 +348,14 @@
             color: #000;
         }
 
+        .success {
+            background: #4CAF50;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
         .progress-bar {
             background: #1a1f2e;
             height: 20px;
@@ -342,6 +369,35 @@
             height: 100%;
             width: 0%;
             transition: width 0.3s;
+        }
+
+        .detailed-progress {
+            background: #232937;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .progress-step {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            padding: 8px;
+            background: #2e3545;
+            border-radius: 5px;
+        }
+
+        .progress-step.active {
+            background: #4CAF50;
+        }
+
+        .progress-step.completed {
+            background: #2e4a3e;
+        }
+
+        .progress-step.error {
+            background: #d32f2f;
         }
 
         .searching-indicator {
@@ -361,12 +417,38 @@
             max-width: 100%;
             max-height: 350px;
         }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-indicator.connected {
+            background: #4CAF50;
+        }
+
+        .status-indicator.disconnected {
+            background: #d32f2f;
+        }
+
+        .status-indicator.connecting {
+            background: #ff9800;
+            animation: pulse 1s infinite;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
             <h1>🔥 핫월렛 토큰 대시보드</h1>
+            <p>거래소 핫월렛의 토큰 잔고를 한 번에 확인하세요!</p>
+            <div id="connectionStatus" style="margin-top: 10px;">
+                <span class="status-indicator connecting"></span>
+                <span id="statusText">시스템 초기화 중...</span>
+            </div>
         </div>
 
         <!-- 검색 섹션 -->
@@ -375,13 +457,37 @@
                 <label>체인을 선택하세요</label>
             </div>
             <div class="search-row">
-                <select id="chainSelect">
+                <select id="chainSelect" onchange="updateNativeTokenButtons()">
                     <option value="ETH">Ethereum</option>
                     <option value="BSC">BSC</option>
                     <option value="Polygon">Polygon</option>
                 </select>
-                <input type="text" id="tokenInput" placeholder="토큰 컨트랙트 주소 (0x...) 또는 ETH, BNB, MATIC">
-                <button onclick="searchToken()">🔍 조회</button>
+                <input type="text" id="tokenInput" placeholder="토큰 컨트랙트 주소 (0x...)">
+                <button id="searchBtn" onclick="searchToken()">🔍 조회</button>
+            </div>
+            <div class="native-token-buttons" id="nativeButtons">
+                <button class="native-btn" onclick="searchNativeToken()">ETH 조회</button>
+            </div>
+        </div>
+
+        <!-- 상세 진행 상태 -->
+        <div id="detailedProgress" class="detailed-progress" style="display: none;">
+            <h4>🔄 검색 진행 상황</h4>
+            <div class="progress-step" id="step1">
+                <span>1. 블록체인 연결</span>
+                <span>⏳</span>
+            </div>
+            <div class="progress-step" id="step2">
+                <span>2. 토큰 정보 조회</span>
+                <span>⏳</span>
+            </div>
+            <div class="progress-step" id="step3">
+                <span>3. 가격 정보 조회</span>
+                <span>⏳</span>
+            </div>
+            <div class="progress-step" id="step4">
+                <span>4. 지갑 잔고 조회</span>
+                <span>⏳</span>
             </div>
         </div>
 
@@ -391,21 +497,15 @@
             <div class="info-grid">
                 <div class="info-card">
                     <div class="info-label">토큰 이름:</div>
-                    <div class="info-value" id="tokenName">
-                        <span class="searching-indicator">검색 중...</span>
-                    </div>
+                    <div class="info-value" id="tokenName">-</div>
                 </div>
                 <div class="info-card">
                     <div class="info-label">심볼:</div>
-                    <div class="info-value" id="tokenSymbol">
-                        <span class="searching-indicator">검색 중...</span>
-                    </div>
+                    <div class="info-value" id="tokenSymbol">-</div>
                 </div>
                 <div class="info-card blue">
                     <div class="info-label">Decimals:</div>
-                    <div class="info-value" id="tokenDecimals">
-                        <span class="searching-indicator">검색 중...</span>
-                    </div>
+                    <div class="info-value" id="tokenDecimals">-</div>
                 </div>
                 <div class="info-card blue">
                     <div class="info-label">컨트랙트:</div>
@@ -416,27 +516,19 @@
             <div class="info-grid">
                 <div class="info-card green">
                     <div class="info-label">토큰 가격:</div>
-                    <div class="info-value" id="tokenPrice">
-                        <span class="searching-indicator">검색 중...</span>
-                    </div>
+                    <div class="info-value" id="tokenPrice">-</div>
                 </div>
                 <div class="info-card green">
                     <div class="info-label">24h 변동:</div>
-                    <div class="info-value" id="priceChange">
-                        <span class="searching-indicator">검색 중...</span>
-                    </div>
+                    <div class="info-value" id="priceChange">-</div>
                 </div>
                 <div class="info-card green">
                     <div class="info-label">Market Cap:</div>
-                    <div class="info-value" id="marketCap">
-                        <span class="searching-indicator">검색 중...</span>
-                    </div>
+                    <div class="info-value" id="marketCap">-</div>
                 </div>
                 <div class="info-card green">
                     <div class="info-label">FDV:</div>
-                    <div class="info-value" id="fdv">
-                        <span class="searching-indicator">검색 중...</span>
-                    </div>
+                    <div class="info-value" id="fdv">-</div>
                 </div>
             </div>
 
@@ -518,16 +610,28 @@
             </div>
         </div>
 
-        <!-- 로딩/에러 -->
+        <!-- 알림 메시지들 -->
         <div id="loading" class="loading" style="display: none;">
             조회 중...
         </div>
         <div id="error" class="error" style="display: none;"></div>
         <div id="warning" class="warning" style="display: none;"></div>
+        <div id="success" class="success" style="display: none;"></div>
     </div>
 
     <script>
-        // Firebase 설정
+        // 🔧 애플리케이션 상태 관리 객체 (전역변수 정리)
+        const AppState = {
+            firebase: null,
+            database: null,
+            wallets: {},
+            web3: null,
+            chart: null,
+            isSearching: false,
+            currentChain: 'ETH'
+        };
+
+        // 🔥 Firebase 설정
         const firebaseConfig = {
             apiKey: "AIzaSyB8OcOZ5uNPy6fqCfLHqM7IJUb2dHfxP6g",
             authDomain: "crypto-dashboard-a5a64.firebaseapp.com",
@@ -538,45 +642,7 @@
             appId: "1:952139620608:web:a9c3291493e78660a653e5"
         };
 
-        // Firebase 초기화
-        firebase.initializeApp(firebaseConfig);
-        const database = firebase.database();
-
-        // 지갑 관리 (Firebase 연동)
-        let wallets = {};
-        
-        // 기본 지갑들 (실제 거래소 핫월렛 주소)
-        const defaultWallets = {
-            "ETH": {
-                "Binance_Hot1": "0x28C6c06298d514Db089934071355E5743bf21d60",
-                "Binance_Hot2": "0x21a31Ee1afC51d94C2eFcCAa2092aD1028285549",
-                "Binance_Hot3": "0xDFd5293D8e347dFe59E90eFd55b2956a1343963d",
-                "Binance_Hot4": "0xF977814e90dA44bFA03b6295A0616a897441aceC",
-                "OKX_Hot1": "0x98EC059Dc3aDFBdd63429454aEB0c990FBA4A128",
-                "OKX_Hot2": "0x06959153B974D0D5fDfd87D561db6d8d4FA0910b",
-                "KuCoin_Hot": "0xd6216fc19db775df9774a6e33526131da7d19a2c",
-                "KuCoin_Hot2": "0xeb2629a2734e272Bcc07BDA959863f316F4bD4Cf",
-                "Bybit_Hot": "0xf89d7b9c864f589bbF53a82105107622B35EaA40",
-                "Gate.io_Hot": "0x0D0707963952f2fBA59dD06f2b425ace40b492Fe",
-                "Gate.io_Hot2": "0x1C4b70a3968436B9A0a9cf5205c787eb81Bb558c",
-                "MEXC_Hot": "0x75e89d5979e4f6fba9f97c104c2f0afb3f1dcb88",
-                "Bitget_Hot": "0x5bdf85216ec1e38d6458c870992a69e38e03f7ef",
-                "Crypto.com_Hot": "0x6262998Ced04146fA42253a5C0AF90CA02dfd2A3",
-                "Huobi_Hot": "0xE93381fB4c4F14bDa253907b18faD305D799241a"
-            },
-            "BSC": {
-                "Binance_BSC": "0x8894E0a0c962CB723c1976a4421c95949bE2D4E3",
-                "Gate.io_BSC": "0x1C4b70a3968436B9A0a9cf5205c787eb81Bb558c",
-                "KuCoin_BSC": "0xEB2d2F1b8c558a40207669291Fda468E50c8A0bB",
-                "MEXC_BSC": "0x4982085C9e2F89F2eCb8131Eca71aFAD896e89CB"
-            },
-            "Polygon": {
-                "Binance_Polygon": "0xe7804c37c13166fF0b37F5aE0BB07A3aEbb6e245",
-                "OKX_Polygon": "0xAA58D356B49C909Ce69c64318E7f8f97E3E9D616"
-            }
-        };
-        
-        // 기본 지갑들 (실제 거래소 핫월렛 주소)
+        // 📋 기본 거래소 지갑들 (중복 제거됨)
         const defaultWallets = {
             "ETH": {
                 "Binance_Hot1": "0x28C6c06298d514Db089934071355E5743bf21d60",
@@ -607,55 +673,7 @@
             }
         };
 
-        // Firebase에서 지갑 데이터 로드
-        async function loadWalletsFromFirebase() {
-            try {
-                const snapshot = await database.ref('wallets').once('value');
-                const firebaseWallets = snapshot.val();
-                
-                if (firebaseWallets) {
-                    wallets = firebaseWallets;
-                    console.log('🔥 Firebase에서 지갑 데이터 로드됨:', Object.keys(wallets));
-                } else {
-                    // Firebase에 데이터가 없으면 기본 지갑으로 초기화
-                    wallets = defaultWallets;
-                    await saveWalletsToFirebase();
-                    console.log('🔥 기본 지갑 데이터를 Firebase에 저장함');
-                }
-                
-                ensureChainWallets();
-                displayWallets();
-            } catch (error) {
-                console.error('Firebase 로드 실패:', error);
-                // Firebase 실패시 기본 지갑 사용
-                wallets = defaultWallets;
-                ensureChainWallets();
-                displayWallets();
-            }
-        }
-
-        // Firebase에 지갑 데이터 저장
-        async function saveWalletsToFirebase() {
-            try {
-                await database.ref('wallets').set(wallets);
-                console.log('🔥 Firebase에 지갑 데이터 저장됨');
-                // 백업으로 로컬 스토리지에도 저장
-                localStorage.setItem('exchangeWallets', JSON.stringify(wallets));
-            } catch (error) {
-                console.error('Firebase 저장 실패:', error);
-                // Firebase 실패시 로컬 스토리지만 사용
-                localStorage.setItem('exchangeWallets', JSON.stringify(wallets));
-            }
-        }
-        
-        // 각 체인에 빈 객체 보장
-        ['ETH', 'BSC', 'Polygon'].forEach(chain => {
-            if (!wallets[chain]) {
-                wallets[chain] = {};
-            }
-        });
-
-        // ERC-20 ABI (간소화)
+        // 📡 ERC-20 토큰 표준 ABI
         const ERC20_ABI = [
             {
                 "constant": true,
@@ -687,26 +705,781 @@
             }
         ];
 
-        let web3 = null;
-        let chart = null;
-        let isSearching = false;
+        // 🔧 유틸리티 함수들
+        const Utils = {
+            // 각 체인에 빈 객체 보장
+            ensureChainWallets() {
+                ['ETH', 'BSC', 'Polygon'].forEach(chain => {
+                    if (!AppState.wallets[chain]) {
+                        AppState.wallets[chain] = {};
+                    }
+                });
+            },
 
-        // Web3 초기화 (Alchemy API Key 적용)
-        function initWeb3(chain) {
-            const ALCHEMY_API_KEY = 'AxaecHY9vMtdBhacBv1dF';
-            
-            const RPC_ENDPOINTS = {
-                ETH: `https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`,
-                BSC: 'https://bsc-dataseed.binance.org/',
-                Polygon: `https://polygon-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`
-            };
-            
-            const rpcUrl = RPC_ENDPOINTS[chain];
-            web3 = new Web3(rpcUrl);
-            console.log(`🔗 ${chain} Alchemy RPC 연결됨`);
+            // 메시지 표시 함수들
+            showMessage(type, message, duration = 5000) {
+                const messageDiv = document.getElementById(type);
+                messageDiv.textContent = message;
+                messageDiv.style.display = 'block';
+                
+                if (duration > 0) {
+                    setTimeout(() => {
+                        messageDiv.style.display = 'none';
+                    }, duration);
+                }
+            },
+
+            hideMessage(type) {
+                document.getElementById(type).style.display = 'none';
+            },
+
+            // 상태 표시기 업데이트
+            updateConnectionStatus(status, text) {
+                const indicator = document.querySelector('.status-indicator');
+                const statusText = document.getElementById('statusText');
+                
+                indicator.className = `status-indicator ${status}`;
+                statusText.textContent = text;
+            },
+
+            // 진행 단계 업데이트
+            updateProgressStep(stepId, status, message = '') {
+                const step = document.getElementById(stepId);
+                const statusIcon = step.querySelector('span:last-child');
+                
+                step.className = `progress-step ${status}`;
+                
+                switch(status) {
+                    case 'active':
+                        statusIcon.textContent = '🔄';
+                        break;
+                    case 'completed':
+                        statusIcon.textContent = '✅';
+                        break;
+                    case 'error':
+                        statusIcon.textContent = '❌';
+                        break;
+                    default:
+                        statusIcon.textContent = '⏳';
+                }
+                
+                if (message) {
+                    step.querySelector('span:first-child').textContent = message;
+                }
+            },
+
+            // 차트 색상 생성
+            getRandomColor() {
+                const colors = [
+                    '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF',
+                    '#FF9F40', '#FF6384', '#C9CBCF', '#4BC0C0', '#36A2EB'
+                ];
+                return colors[Math.floor(Math.random() * colors.length)];
+            },
+
+            // 숫자 포맷팅
+            formatNumber(num) {
+                if (num >= 1e9) return (num / 1e9).toFixed(2) + 'B';
+                if (num >= 1e6) return (num / 1e6).toFixed(2) + 'M';
+                if (num >= 1e3) return (num / 1e3).toFixed(2) + 'K';
+                return num.toLocaleString();
+            }
+        };
+
+        // 🔥 Firebase 관리 클래스
+        class FirebaseManager {
+            static async initialize() {
+                try {
+                    AppState.firebase = firebase.initializeApp(firebaseConfig);
+                    AppState.database = firebase.database();
+                    Utils.updateConnectionStatus('connected', 'Firebase 연결됨');
+                    console.log('🔥 Firebase 초기화 완료');
+                    return true;
+                } catch (error) {
+                    console.error('Firebase 초기화 실패:', error);
+                    Utils.updateConnectionStatus('disconnected', 'Firebase 연결 실패');
+                    Utils.showMessage('error', '클라우드 연결에 실패했습니다. 로컬 모드로 실행됩니다.');
+                    return false;
+                }
+            }
+
+            static async loadWallets() {
+                try {
+                    const snapshot = await AppState.database.ref('wallets').once('value');
+                    const firebaseWallets = snapshot.val();
+                    
+                    if (firebaseWallets) {
+                        AppState.wallets = firebaseWallets;
+                        console.log('🔥 Firebase에서 지갑 데이터 로드됨');
+                    } else {
+                        AppState.wallets = JSON.parse(JSON.stringify(defaultWallets));
+                        await this.saveWallets();
+                        console.log('🔥 기본 지갑 데이터를 Firebase에 저장함');
+                    }
+                    
+                    Utils.ensureChainWallets();
+                    WalletManager.displayWallets();
+                    return true;
+                } catch (error) {
+                    console.error('Firebase 로드 실패:', error);
+                    AppState.wallets = JSON.parse(JSON.stringify(defaultWallets));
+                    Utils.ensureChainWallets();
+                    WalletManager.displayWallets();
+                    Utils.showMessage('warning', 'Firebase 로드 실패. 기본 지갑으로 실행됩니다.');
+                    return false;
+                }
+            }
+
+            static async saveWallets() {
+                try {
+                    await AppState.database.ref('wallets').set(AppState.wallets);
+                    console.log('🔥 Firebase에 지갑 데이터 저장됨');
+                    return true;
+                } catch (error) {
+                    console.error('Firebase 저장 실패:', error);
+                    Utils.showMessage('error', 'Firebase 저장에 실패했습니다.');
+                    return false;
+                }
+            }
         }
 
-        // 지갑 관리 섹션 토글
+        // 🌐 블록체인 연결 관리 클래스
+        class BlockchainManager {
+            static RPC_ENDPOINTS = {
+                ETH: 'https://eth.llamarpc.com',
+                BSC: 'https://bsc-dataseed.binance.org/',
+                Polygon: 'https://polygon-rpc.com'
+            };
+
+            static async connectToChain(chain) {
+                try {
+                    Utils.updateProgressStep('step1', 'active', '1. 블록체인 연결 중...');
+                    
+                    const rpcUrl = this.RPC_ENDPOINTS[chain];
+                    if (!rpcUrl) {
+                        throw new Error(`지원하지 않는 체인입니다: ${chain}`);
+                    }
+                    
+                    AppState.web3 = new Web3(rpcUrl);
+                    AppState.currentChain = chain;
+                    
+                    // 연결 테스트
+                    await AppState.web3.eth.getBlockNumber();
+                    
+                    Utils.updateProgressStep('step1', 'completed', '1. 블록체인 연결 완료');
+                    console.log(`🔗 ${chain} 체인 연결 완료`);
+                    return true;
+                } catch (error) {
+                    Utils.updateProgressStep('step1', 'error', '1. 블록체인 연결 실패');
+                    throw new Error(`${chain} 체인 연결 실패: ${error.message}`);
+                }
+            }
+
+            static async getTokenInfo(tokenAddress) {
+                try {
+                    Utils.updateProgressStep('step2', 'active', '2. 토큰 정보 조회 중...');
+                    
+                    if (tokenAddress === '0x0000000000000000000000000000000000000000') {
+                        const nativeTokens = {
+                            ETH: { name: 'Ethereum', symbol: 'ETH', decimals: 18 },
+                            BSC: { name: 'BNB', symbol: 'BNB', decimals: 18 },
+                            Polygon: { name: 'Polygon', symbol: 'MATIC', decimals: 18 }
+                        };
+                        
+                        const result = nativeTokens[AppState.currentChain];
+                        Utils.updateProgressStep('step2', 'completed', '2. 토큰 정보 조회 완료');
+                        return result;
+                    }
+
+                    const contract = new AppState.web3.eth.Contract(ERC20_ABI, tokenAddress);
+                    
+                    const [name, symbol, decimals] = await Promise.all([
+                        contract.methods.name().call().catch(() => 'Unknown'),
+                        contract.methods.symbol().call().catch(() => 'UNKNOWN'),
+                        contract.methods.decimals().call().catch(() => 18)
+                    ]);
+
+                    Utils.updateProgressStep('step2', 'completed', '2. 토큰 정보 조회 완료');
+                    
+                    return {
+                        name: name || 'Unknown',
+                        symbol: symbol || 'UNKNOWN',
+                        decimals: parseInt(decimals) || 18
+                    };
+                } catch (error) {
+                    Utils.updateProgressStep('step2', 'error', '2. 토큰 정보 조회 실패');
+                    throw new Error(`토큰 정보 조회 실패: ${error.message}`);
+                }
+            }
+
+            static async getTokenBalance(tokenAddress, walletAddress, decimals) {
+                try {
+                    if (tokenAddress === '0x0000000000000000000000000000000000000000') {
+                        const balance = await AppState.web3.eth.getBalance(walletAddress);
+                        return parseFloat(AppState.web3.utils.fromWei(balance, 'ether'));
+                    } else {
+                        const contract = new AppState.web3.eth.Contract(ERC20_ABI, tokenAddress);
+                        const balance = await contract.methods.balanceOf(walletAddress).call();
+                        
+                        if (balance && balance !== '0') {
+                            return parseFloat(balance) / Math.pow(10, decimals);
+                        }
+                        return 0;
+                    }
+                } catch (error) {
+                    console.error(`잔고 조회 실패 (${walletAddress}):`, error);
+                    return 0;
+                }
+            }
+
+            // 🚀 병렬 처리로 성능 개선
+            static async getBalancesParallel(tokenAddress, wallets, decimals, batchSize = 10) {
+                Utils.updateProgressStep('step4', 'active', '4. 지갑 잔고 조회 중...');
+                
+                const walletEntries = Object.entries(wallets);
+                const results = {};
+                let completed = 0;
+
+                // 배치 단위로 병렬 처리
+                for (let i = 0; i < walletEntries.length; i += batchSize) {
+                    const batch = walletEntries.slice(i, i + batchSize);
+                    
+                    const batchPromises = batch.map(async ([name, address]) => {
+                        try {
+                            const balance = await this.getTokenBalance(tokenAddress, address, decimals);
+                            completed++;
+                            
+                            // 진행률 업데이트
+                            const progress = (completed / walletEntries.length) * 100;
+                            document.getElementById('progressText').textContent = 
+                                `지갑 조회 중... (${completed}/${walletEntries.length})`;
+                            document.getElementById('progressFill').style.width = `${progress}%`;
+                            
+                            return { name, balance };
+                        } catch (error) {
+                            completed++;
+                            console.error(`${name} 조회 실패:`, error);
+                            return { name, balance: 0 };
+                        }
+                    });
+
+                    const batchResults = await Promise.all(batchPromises);
+                    
+                    // 결과 저장 (잔고가 있는 것만)
+                    batchResults.forEach(({ name, balance }) => {
+                        if (balance > 0) {
+                            results[name] = balance;
+                        }
+                    });
+
+                    // 배치 간 짧은 대기 (RPC 서버 부하 방지)
+                    if (i + batchSize < walletEntries.length) {
+                        await new Promise(resolve => setTimeout(resolve, 50));
+                    }
+                }
+
+                Utils.updateProgressStep('step4', 'completed', '4. 지갑 잔고 조회 완료');
+                return results;
+            }
+        }
+
+        // 💰 가격 정보 관리 클래스
+        class PriceManager {
+            static async getTokenPrice(tokenAddress, chain) {
+                try {
+                    Utils.updateProgressStep('step3', 'active', '3. 가격 정보 조회 중...');
+                    
+                    let geckoId = '';
+                    
+                    if (tokenAddress === '0x0000000000000000000000000000000000000000') {
+                        const nativeIds = {
+                            ETH: 'ethereum',
+                            BSC: 'binancecoin',
+                            Polygon: 'matic-network'
+                        };
+                        geckoId = nativeIds[chain];
+                    } else {
+                        const platformMap = {
+                            ETH: 'ethereum',
+                            BSC: 'binance-smart-chain',
+                            Polygon: 'polygon-pos'
+                        };
+                        
+                        const platform = platformMap[chain];
+                        const searchUrl = `https://api.coingecko.com/api/v3/coins/${platform}/contract/${tokenAddress}`;
+                        
+                        try {
+                            const response = await fetch(searchUrl);
+                            if (response.ok) {
+                                const tokenData = await response.json();
+                                geckoId = tokenData.id;
+                            }
+                        } catch (e) {
+                            console.log('토큰 검색 실패:', e);
+                        }
+                    }
+                    
+                    if (geckoId) {
+                        const priceUrl = `https://api.coingecko.com/api/v3/simple/price?ids=${geckoId}&vs_currencies=usd&include_market_cap=true&include_24hr_change=true`;
+                        const response = await fetch(priceUrl);
+                        const priceData = await response.json();
+                        
+                        if (priceData[geckoId]) {
+                            const detailUrl = `https://api.coingecko.com/api/v3/coins/${geckoId}`;
+                            const detailResponse = await fetch(detailUrl);
+                            const detailData = await detailResponse.json();
+                            
+                            Utils.updateProgressStep('step3', 'completed', '3. 가격 정보 조회 완료');
+                            
+                            return {
+                                price: priceData[geckoId].usd || 0,
+                                marketCap: priceData[geckoId].usd_market_cap || 0,
+                                change24h: priceData[geckoId].usd_24h_change || 0,
+                                fdv: detailData.market_data?.fully_diluted_valuation?.usd || priceData[geckoId].usd_market_cap || 0,
+                                rank: detailData.market_cap_rank || 0,
+                                name: detailData.name || 'Unknown',
+                                symbol: detailData.symbol?.toUpperCase() || 'UNKNOWN'
+                            };
+                        }
+                    }
+                    
+                    Utils.updateProgressStep('step3', 'completed', '3. 가격 정보 조회 완료 (가격 없음)');
+                    return null;
+                } catch (error) {
+                    Utils.updateProgressStep('step3', 'error', '3. 가격 정보 조회 실패');
+                    console.error('가격 정보 조회 실패:', error);
+                    return null;
+                }
+            }
+        }
+
+        // 💼 지갑 관리 클래스
+        class WalletManager {
+            static displayWallets() {
+                const walletList = document.getElementById('walletList');
+                walletList.innerHTML = '';
+                
+                let totalCount = 0;
+                Object.values(AppState.wallets).forEach(chainWallets => {
+                    totalCount += Object.keys(chainWallets).length;
+                });
+                
+                const countDiv = document.createElement('div');
+                countDiv.style.marginBottom = '10px';
+                countDiv.style.color = '#aaa';
+                countDiv.textContent = `총 ${totalCount}개의 지갑이 등록되어 있습니다.`;
+                walletList.appendChild(countDiv);
+                
+                Object.entries(AppState.wallets).forEach(([chain, chainWallets]) => {
+                    Object.entries(chainWallets).forEach(([name, address]) => {
+                        const item = document.createElement('div');
+                        item.className = 'wallet-item';
+                        item.innerHTML = `
+                            <span>${chain} - ${name}: ${address}</span>
+                            <button class="delete-btn" onclick="WalletManager.deleteWallet('${chain}', '${name}')">삭제</button>
+                        `;
+                        walletList.appendChild(item);
+                    });
+                });
+            }
+
+            static findWalletByAddress(address) {
+                const normalizedAddress = address.toLowerCase().trim();
+                for (const [chain, chainWallets] of Object.entries(AppState.wallets)) {
+                    for (const [name, walletAddress] of Object.entries(chainWallets)) {
+                        if (walletAddress.toLowerCase().trim() === normalizedAddress) {
+                            return { chain, name };
+                        }
+                    }
+                }
+                return null;
+            }
+
+            static async addWallet() {
+                const chain = document.getElementById('walletChain').value;
+                const name = document.getElementById('walletName').value.trim();
+                let address = document.getElementById('walletAddress').value.trim();
+                
+                if (!name || !address) {
+                    Utils.showMessage('error', '거래소명과 주소를 모두 입력하세요.');
+                    return;
+                }
+                
+                if (!address.startsWith('0x')) {
+                    address = '0x' + address;
+                }
+                
+                if (address.length !== 42) {
+                    Utils.showMessage('error', '올바른 주소 형식이 아닙니다. (42자리 필요)');
+                    return;
+                }
+                
+                try {
+                    const web3Temp = new Web3();
+                    address = web3Temp.utils.toChecksumAddress(address);
+                } catch (e) {
+                    Utils.showMessage('error', '유효하지 않은 이더리움 주소입니다.');
+                    return;
+                }
+                
+                if (!AppState.wallets[chain]) {
+                    AppState.wallets[chain] = {};
+                }
+                
+                const existingWallet = this.findWalletByAddress(address);
+                if (existingWallet) {
+                    Utils.showMessage('error', `이미 등록된 주소입니다! (${existingWallet.chain} - ${existingWallet.name})`);
+                    return;
+                }
+                
+                if (AppState.wallets[chain][name]) {
+                    Utils.showMessage('error', `${chain} 체인에 이미 ${name} 이름이 존재합니다.`);
+                    return;
+                }
+                
+                AppState.wallets[chain][name] = address;
+                
+                const saved = await FirebaseManager.saveWallets();
+                if (saved) {
+                    Utils.showMessage('success', `🔥 ${chain} - ${name} 지갑이 추가되었습니다!`);
+                } else {
+                    Utils.showMessage('warning', `지갑은 추가되었지만 클라우드 동기화에 실패했습니다.`);
+                }
+                
+                this.displayWallets();
+                
+                document.getElementById('walletName').value = '';
+                document.getElementById('walletAddress').value = '';
+            }
+
+            static async deleteWallet(chain, name) {
+                if (confirm(`${chain} - ${name} 지갑을 삭제하시겠습니까?`)) {
+                    delete AppState.wallets[chain][name];
+                    
+                    const saved = await FirebaseManager.saveWallets();
+                    if (saved) {
+                        Utils.showMessage('success', '🔥 지갑이 삭제되었습니다!');
+                    } else {
+                        Utils.showMessage('warning', '지갑은 삭제되었지만 클라우드 동기화에 실패했습니다.');
+                    }
+                    
+                    this.displayWallets();
+                }
+            }
+        }
+
+        // 📊 결과 표시 관리 클래스
+        class ResultManager {
+            static displayTokenInfo(tokenInfo, contractAddress) {
+                document.getElementById('contractAddress').textContent = contractAddress;
+                document.getElementById('tokenName').textContent = tokenInfo.name;
+                document.getElementById('tokenSymbol').textContent = tokenInfo.symbol;
+                document.getElementById('tokenDecimals').textContent = tokenInfo.decimals;
+            }
+
+            static displayPriceInfo(priceInfo) {
+                if (priceInfo) {
+                    document.getElementById('tokenPrice').textContent = 
+                        priceInfo.price < 0.01 ? `$${priceInfo.price.toFixed(8)}` : `$${priceInfo.price.toFixed(2)}`;
+                    document.getElementById('priceChange').innerHTML = 
+                        `${priceInfo.change24h > 0 ? '🟢' : '🔴'} ${priceInfo.change24h.toFixed(2)}%`;
+                    document.getElementById('marketCap').textContent = 
+                        `$${Utils.formatNumber(priceInfo.marketCap)}`;
+                    document.getElementById('fdv').textContent = 
+                        `$${Utils.formatNumber(priceInfo.fdv)}`;
+                } else {
+                    document.getElementById('tokenPrice').textContent = '가격 정보 없음';
+                    document.getElementById('priceChange').textContent = '-';
+                    document.getElementById('marketCap').textContent = '-';
+                    document.getElementById('fdv').textContent = '-';
+                }
+            }
+
+            static displayBalances(balances, tokenPrice = 0) {
+                if (Object.keys(balances).length === 0) {
+                    Utils.showMessage('warning', '거래소에서 해당 토큰을 찾을 수 없습니다.');
+                    return;
+                }
+                
+                let cexTotal = 0, dexTotal = 0;
+                const sortedBalances = Object.entries(balances).sort((a, b) => b[1] - a[1]);
+                
+                sortedBalances.forEach(([name, balance]) => {
+                    if (name.toLowerCase().includes('swap') || name.toLowerCase().includes('dex')) {
+                        dexTotal += balance;
+                    } else {
+                        cexTotal += balance;
+                    }
+                });
+                
+                const totalBalance = cexTotal + dexTotal;
+                
+                // 통계 표시
+                document.getElementById('cexTotal').textContent = Utils.formatNumber(cexTotal);
+                document.getElementById('dexTotal').textContent = Utils.formatNumber(dexTotal);
+                document.getElementById('cexValue').textContent = '$' + Utils.formatNumber(cexTotal * tokenPrice);
+                document.getElementById('dexValue').textContent = '$' + Utils.formatNumber(dexTotal * tokenPrice);
+                document.getElementById('totalBalance').textContent = Utils.formatNumber(totalBalance);
+                document.getElementById('totalValue').textContent = '$' + Utils.formatNumber(totalBalance * tokenPrice);
+                
+                // 차트 및 테이블 업데이트
+                this.updateChart(sortedBalances, totalBalance);
+                this.fillTable(sortedBalances);
+                
+                Utils.showMessage('success', `🎉 총 ${Object.keys(balances).length}개 거래소에서 토큰을 발견했습니다!`);
+            }
+
+            static updateChart(balances, total) {
+                const ctx = document.getElementById('chartCanvas').getContext('2d');
+                
+                const labels = [];
+                const data = [];
+                const colors = [];
+                
+                const displayBalances = balances.slice(0, 10);
+                
+                displayBalances.forEach(([name, balance]) => {
+                    labels.push(name);
+                    data.push(balance);
+                    colors.push(Utils.getRandomColor());
+                });
+                
+                if (!AppState.chart) {
+                    AppState.chart = new Chart(ctx, {
+                        type: 'doughnut',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                data: data,
+                                backgroundColor: colors,
+                                borderWidth: 2,
+                                borderColor: '#1a1f2e'
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    display: true,
+                                    position: 'right',
+                                    labels: {
+                                        color: '#ffffff',
+                                        generateLabels: function(chart) {
+                                            const data = chart.data;
+                                            if (data.labels.length && data.datasets.length) {
+                                                return data.labels.map((label, i) => {
+                                                    const value = data.datasets[0].data[i];
+                                                    const percentage = ((value / total) * 100).toFixed(1);
+                                                    return {
+                                                        text: `${label}: ${Utils.formatNumber(value)} (${percentage}%)`,
+                                                        fillStyle: data.datasets[0].backgroundColor[i],
+                                                        strokeStyle: data.datasets[0].backgroundColor[i],
+                                                        fontColor: '#ffffff',
+                                                        index: i
+                                                    };
+                                                });
+                                            }
+                                            return [];
+                                        }
+                                    }
+                                },
+                                title: {
+                                    display: true,
+                                    text: `${AppState.currentChain} - Token Distribution`,
+                                    color: '#ffffff',
+                                    font: { size: 16 }
+                                }
+                            }
+                        }
+                    });
+                } else {
+                    AppState.chart.data.labels = labels;
+                    AppState.chart.data.datasets[0].data = data;
+                    AppState.chart.data.datasets[0].backgroundColor = colors;
+                    AppState.chart.update();
+                }
+            }
+
+            static fillTable(balances) {
+                const tbody = document.getElementById('tableBody');
+                tbody.innerHTML = '';
+                
+                balances.forEach(([name, balance], index) => {
+                    const address = AppState.wallets[AppState.currentChain][name] || '주소 없음';
+                    const row = tbody.insertRow();
+                    row.innerHTML = `
+                        <td>${index + 1}</td>
+                        <td>${name}</td>
+                        <td style="font-family: monospace; font-size: 11px;">${address}</td>
+                        <td><strong>${Utils.formatNumber(balance)}</strong></td>
+                    `;
+                });
+            }
+
+            static resetResults() {
+                document.getElementById('tokenName').textContent = '-';
+                document.getElementById('tokenSymbol').textContent = '-';
+                document.getElementById('tokenDecimals').textContent = '-';
+                document.getElementById('contractAddress').textContent = '-';
+                document.getElementById('tokenPrice').textContent = '-';
+                document.getElementById('priceChange').textContent = '-';
+                document.getElementById('marketCap').textContent = '-';
+                document.getElementById('fdv').textContent = '-';
+                document.getElementById('cexTotal').textContent = '0';
+                document.getElementById('dexTotal').textContent = '0';
+                document.getElementById('cexValue').textContent = '$0';
+                document.getElementById('dexValue').textContent = '$0';
+                document.getElementById('totalBalance').textContent = '0';
+                document.getElementById('totalValue').textContent = '$0';
+                document.getElementById('tableBody').innerHTML = '';
+            }
+        }
+
+        // 🚀 메인 검색 함수
+        async function searchToken() {
+            if (AppState.isSearching) {
+                Utils.showMessage('warning', '이미 검색 중입니다. 잠시만 기다려주세요.');
+                return;
+            }
+            
+            const chain = document.getElementById('chainSelect').value;
+            const input = document.getElementById('tokenInput').value.trim();
+            
+            if (!input) {
+                Utils.showMessage('error', '토큰 주소를 입력하세요.');
+                return;
+            }
+            
+            AppState.isSearching = true;
+            document.getElementById('searchBtn').disabled = true;
+            Utils.hideMessage('error');
+            Utils.hideMessage('warning');
+            Utils.hideMessage('success');
+            
+            // 상세 진행 상황 표시
+            document.getElementById('detailedProgress').style.display = 'block';
+            document.getElementById('results').style.display = 'block';
+            ResultManager.resetResults();
+            
+            let tokenAddress = input;
+            
+            // 네이티브 토큰 처리
+            if (!input.startsWith('0x')) {
+                const nativeTokens = {
+                    ETH: ['ETH', 'ETHEREUM'],
+                    BSC: ['BNB', 'BSC'],
+                    Polygon: ['MATIC', 'POLYGON']
+                };
+                
+                const chainTokens = nativeTokens[chain] || [];
+                if (chainTokens.includes(input.toUpperCase())) {
+                    tokenAddress = '0x0000000000000000000000000000000000000000';
+                } else {
+                    Utils.showMessage('error', `${input} 토큰의 컨트랙트 주소를 직접 입력하세요.`);
+                    AppState.isSearching = false;
+                    document.getElementById('searchBtn').disabled = false;
+                    document.getElementById('detailedProgress').style.display = 'none';
+                    return;
+                }
+            }
+            
+            try {
+                console.log(`🚀 ${chain} 체인에서 ${tokenAddress} 검색 시작`);
+                
+                // 1. 블록체인 연결
+                await BlockchainManager.connectToChain(chain);
+                
+                // 2. 토큰 정보와 가격 정보 병렬로 가져오기
+                const [tokenInfo, priceInfo] = await Promise.all([
+                    BlockchainManager.getTokenInfo(tokenAddress),
+                    PriceManager.getTokenPrice(tokenAddress, chain)
+                ]);
+                
+                // 토큰 정보 표시
+                ResultManager.displayTokenInfo(tokenInfo, tokenAddress);
+                ResultManager.displayPriceInfo(priceInfo);
+                
+                // 3. 지갑 잔고 조회 (병렬 처리)
+                const chainWallets = AppState.wallets[chain] || {};
+                
+                if (Object.keys(chainWallets).length === 0) {
+                    throw new Error(`${chain} 체인에 등록된 지갑이 없습니다.`);
+                }
+                
+                // 진행 상태 표시
+                document.getElementById('progressSection').style.display = 'block';
+                
+                const balances = await BlockchainManager.getBalancesParallel(
+                    tokenAddress, 
+                    chainWallets, 
+                    tokenInfo.decimals,
+                    10 // 배치 크기
+                );
+                
+                // 결과 표시
+                ResultManager.displayBalances(balances, priceInfo ? priceInfo.price : 0);
+                
+                // 진행 상태 숨기기
+                setTimeout(() => {
+                    document.getElementById('progressSection').style.display = 'none';
+                    document.getElementById('detailedProgress').style.display = 'none';
+                }, 2000);
+                
+            } catch (error) {
+                console.error('검색 오류:', error);
+                
+                // 구체적인 에러 메시지 표시
+                let errorMessage = '알 수 없는 오류가 발생했습니다.';
+                
+                if (error.message.includes('연결')) {
+                    errorMessage = `${chain} 블록체인 연결에 실패했습니다. 잠시 후 다시 시도해주세요.`;
+                } else if (error.message.includes('토큰 정보')) {
+                    errorMessage = '유효하지 않은 토큰 주소입니다. 컨트랙트 주소를 확인해주세요.';
+                } else if (error.message.includes('지갑')) {
+                    errorMessage = `${chain} 체인에 등록된 지갑이 없습니다. 지갑을 먼저 추가해주세요.`;
+                } else {
+                    errorMessage = error.message;
+                }
+                
+                Utils.showMessage('error', errorMessage);
+                document.getElementById('detailedProgress').style.display = 'none';
+            } finally {
+                AppState.isSearching = false;
+                document.getElementById('searchBtn').disabled = false;
+            }
+        }
+
+        // 🔸 네이티브 토큰 검색 (버튼 클릭)
+        function searchNativeToken() {
+            const chain = document.getElementById('chainSelect').value;
+            const nativeTokens = {
+                ETH: 'ETH',
+                BSC: 'BNB',
+                Polygon: 'MATIC'
+            };
+            
+            document.getElementById('tokenInput').value = nativeTokens[chain];
+            searchToken();
+        }
+
+        // 🔄 네이티브 토큰 버튼 업데이트
+        function updateNativeTokenButtons() {
+            const chain = document.getElementById('chainSelect').value;
+            const nativeButtons = document.getElementById('nativeButtons');
+            
+            const nativeTokens = {
+                ETH: 'ETH',
+                BSC: 'BNB',
+                Polygon: 'MATIC'
+            };
+            
+            nativeButtons.innerHTML = `
+                <button class="native-btn" onclick="searchNativeToken()">${nativeTokens[chain]} 조회</button>
+            `;
+        }
+
+        // 🔧 지갑 관리 토글
         function toggleWalletManager() {
             const content = document.getElementById('walletManagerContent');
             const icon = document.getElementById('walletToggleIcon');
@@ -715,552 +1488,34 @@
             icon.classList.toggle('collapsed');
         }
 
-        // 지갑 목록 표시
-        function displayWallets() {
-            const walletList = document.getElementById('walletList');
-            walletList.innerHTML = '';
-            
-            let totalCount = 0;
-            Object.values(wallets).forEach(chainWallets => {
-                totalCount += Object.keys(chainWallets).length;
-            });
-            
-            // 총 지갑 수 표시
-            const countDiv = document.createElement('div');
-            countDiv.style.marginBottom = '10px';
-            countDiv.style.color = '#aaa';
-            countDiv.textContent = `총 ${totalCount}개의 지갑이 등록되어 있습니다.`;
-            walletList.appendChild(countDiv);
-            
-            Object.entries(wallets).forEach(([chain, chainWallets]) => {
-                Object.entries(chainWallets).forEach(([name, address]) => {
-                    const item = document.createElement('div');
-                    item.className = 'wallet-item';
-                    item.innerHTML = `
-                        <span>${chain} - ${name}: ${address}</span>
-                        <button class="delete-btn" onclick="deleteWallet('${chain}', '${name}')">삭제</button>
-                    `;
-                    walletList.appendChild(item);
-                });
-            });
-        }
-
-        // 주소로 지갑 찾기
-        function findWalletByAddress(address) {
-            const normalizedAddress = address.toLowerCase().trim();
-            for (const [chain, chainWallets] of Object.entries(wallets)) {
-                for (const [name, walletAddress] of Object.entries(chainWallets)) {
-                    if (walletAddress.toLowerCase().trim() === normalizedAddress) {
-                        return { chain, name };
-                    }
-                }
-            }
-            return null;
-        }
-
-        // 지갑 추가 (Firebase 연동)
+        // 💼 지갑 추가 함수 (전역)
         async function addWallet() {
-            const chain = document.getElementById('walletChain').value;
-            const name = document.getElementById('walletName').value.trim();
-            let address = document.getElementById('walletAddress').value.trim();
-            
-            if (!name || !address) {
-                alert('거래소명과 주소를 입력하세요.');
-                return;
-            }
-            
-            // 주소 정규화
-            if (!address.startsWith('0x')) {
-                address = '0x' + address;
-            }
-            
-            if (address.length !== 42) {
-                alert('올바른 주소 형식이 아닙니다. (42자리)');
-                return;
-            }
-            
-            // 주소 체크섬 적용
-            try {
-                const web3Temp = new Web3();
-                address = web3Temp.utils.toChecksumAddress(address);
-            } catch (e) {
-                alert('유효하지 않은 이더리움 주소입니다.');
-                return;
-            }
-            
-            // 지갑 객체가 없으면 생성
-            if (!wallets[chain]) {
-                wallets[chain] = {};
-            }
-            
-            // 주소 중복 체크
-            const existingWallet = findWalletByAddress(address);
-            if (existingWallet) {
-                alert(`이미 등록된 주소입니다!\n체인: ${existingWallet.chain}\n거래소명: ${existingWallet.name}`);
-                return;
-            }
-            
-            // 이름 중복 체크
-            if (wallets[chain][name]) {
-                alert(`${chain} 체인에 이미 ${name} 이름으로 등록된 지갑이 있습니다.`);
-                return;
-            }
-            
-            // 지갑 추가
-            wallets[chain][name] = address;
-            
-            // Firebase에 저장
-            await saveWalletsToFirebase();
-            
-            // 목록 새로고침
-            displayWallets();
-            
-            // 입력 필드 초기화
-            document.getElementById('walletName').value = '';
-            document.getElementById('walletAddress').value = '';
-            
-            alert(`🔥 ${chain} 체인에 ${name} 지갑이 추가되었습니다! (Firebase 동기화됨)`);
-        }
-
-        // 지갑 삭제 (Firebase 연동)
-        async function deleteWallet(chain, name) {
-            if (confirm(`${chain} - ${name} 지갑을 삭제하시겠습니까?`)) {
-                delete wallets[chain][name];
-                
-                // Firebase에 저장
-                await saveWalletsToFirebase();
-                
-                displayWallets();
-                alert('🔥 지갑이 삭제되었습니다! (Firebase 동기화됨)');
-            }
-        }
-
-        // CoinGecko에서 토큰 가격 정보 가져오기
-        async function getTokenPriceFromCoinGecko(tokenAddress, chain) {
-            try {
-                // 네이티브 토큰 처리
-                let geckoId = '';
-                if (tokenAddress === '0x0000000000000000000000000000000000000000') {
-                    if (chain === 'ETH') geckoId = 'ethereum';
-                    else if (chain === 'BSC') geckoId = 'binancecoin';
-                    else if (chain === 'Polygon') geckoId = 'matic-network';
-                } else {
-                    // 일반 토큰은 주소로 검색
-                    const platform = chain === 'ETH' ? 'ethereum' : chain === 'BSC' ? 'binance-smart-chain' : 'polygon-pos';
-                    const searchUrl = `https://api.coingecko.com/api/v3/coins/${platform}/contract/${tokenAddress}`;
-                    
-                    try {
-                        const response = await fetch(searchUrl);
-                        const tokenData = await response.json();
-                        geckoId = tokenData.id;
-                    } catch (e) {
-                        console.log('토큰 검색 실패:', e);
-                    }
-                }
-                
-                if (geckoId) {
-                    // 가격 정보 가져오기
-                    const priceUrl = `https://api.coingecko.com/api/v3/simple/price?ids=${geckoId}&vs_currencies=usd&include_market_cap=true&include_24hr_change=true`;
-                    const response = await fetch(priceUrl);
-                    const priceData = await response.json();
-                    
-                    if (priceData[geckoId]) {
-                        // 상세 정보 가져오기
-                        const detailUrl = `https://api.coingecko.com/api/v3/coins/${geckoId}`;
-                        const detailResponse = await fetch(detailUrl);
-                        const detailData = await detailResponse.json();
-                        
-                        return {
-                            price: priceData[geckoId].usd || 0,
-                            marketCap: priceData[geckoId].usd_market_cap || 0,
-                            change24h: priceData[geckoId].usd_24h_change || 0,
-                            fdv: detailData.market_data?.fully_diluted_valuation?.usd || priceData[geckoId].usd_market_cap || 0,
-                            rank: detailData.market_cap_rank || 0,
-                            name: detailData.name || 'Unknown',
-                            symbol: detailData.symbol?.toUpperCase() || 'UNKNOWN'
-                        };
-                    }
-                }
-            } catch (error) {
-                console.error('CoinGecko API 오류:', error);
-            }
-            
-            return null;
-        }
-
-        // RPC로 토큰 정보 가져오기
-        async function getTokenInfoRPC(tokenAddress) {
-            try {
-                if (tokenAddress === '0x0000000000000000000000000000000000000000') {
-                    return {
-                        name: 'Ethereum',
-                        symbol: 'ETH',
-                        decimals: 18
-                    };
-                }
-
-                const contract = new web3.eth.Contract(ERC20_ABI, tokenAddress);
-                
-                const [name, symbol, decimals] = await Promise.all([
-                    contract.methods.name().call(),
-                    contract.methods.symbol().call(), 
-                    contract.methods.decimals().call()
-                ]);
-
-                console.log(`✅ RPC 토큰 정보: ${name} (${symbol}) - ${decimals} decimals`);
-                
-                return {
-                    name: name || 'Unknown',
-                    symbol: symbol || 'UNKNOWN',
-                    decimals: parseInt(decimals) || 18
-                };
-            } catch (error) {
-                console.error('RPC 토큰 정보 조회 실패:', error);
-                return {
-                    name: 'Unknown',
-                    symbol: 'UNKNOWN', 
-                    decimals: 18
-                };
-            }
-        }
-
-        // RPC로 토큰 잔고 조회
-        async function getTokenBalanceRPC(tokenAddress, walletAddress, decimals) {
-            try {
-                if (tokenAddress === '0x0000000000000000000000000000000000000000') {
-                    // 네이티브 토큰 (ETH, BNB, MATIC)
-                    const balance = await web3.eth.getBalance(walletAddress);
-                    return parseFloat(web3.utils.fromWei(balance, 'ether'));
-                } else {
-                    // ERC-20 토큰
-                    const contract = new web3.eth.Contract(ERC20_ABI, tokenAddress);
-                    const balance = await contract.methods.balanceOf(walletAddress).call();
-                    
-                    if (balance && balance !== '0') {
-                        const tokenBalance = parseFloat(balance) / Math.pow(10, decimals);
-                        console.log(`🎯 RPC 정확한 잔고: ${walletAddress.substring(0, 10)}... = ${tokenBalance.toLocaleString()}`);
-                        return tokenBalance;
-                    }
-                    return 0;
-                }
-            } catch (error) {
-                console.error('RPC 잔고 조회 실패:', error);
-                return 0;
-            }
-        }
-
-        // 검색 시작
-        async function searchToken() {
-            if (isSearching) {
-                alert('이미 검색 중입니다. 잠시만 기다려주세요.');
-                return;
-            }
-            
-            const chain = document.getElementById('chainSelect').value;
-            const input = document.getElementById('tokenInput').value.trim();
-            
-            if (!input) {
-                showError('토큰 주소를 입력하세요.');
-                return;
-            }
-            
-            isSearching = true;
-            showLoading(true);
-            hideError();
-            
-            let tokenAddress = input;
-            
-            // 네이티브 토큰 처리
-            if (!input.startsWith('0x')) {
-                if (input.toUpperCase() === chain || 
-                    (chain === 'BSC' && input.toUpperCase() === 'BNB') ||
-                    (chain === 'Polygon' && input.toUpperCase() === 'MATIC')) {
-                    tokenAddress = '0x0000000000000000000000000000000000000000';
-                } else {
-                    showError(`${input} 토큰의 컨트랙트 주소를 직접 입력하세요.`);
-                    isSearching = false;
-                    showLoading(false);
-                    return;
-                }
-            }
-            
-            try {
-                // 결과 섹션 표시
-                document.getElementById('results').style.display = 'block';
-                resetResults();
-                
-                // Web3 초기화
-                initWeb3(chain);
-                
-                console.log(`🚀 RPC 검색 시작: ${tokenAddress}`);
-                
-                // 1. 토큰 정보와 가격 정보 병렬로 가져오기
-                const [tokenInfo, priceInfo] = await Promise.all([
-                    getTokenInfoRPC(tokenAddress),
-                    getTokenPriceFromCoinGecko(tokenAddress, chain)
-                ]);
-                
-                // 토큰 정보 표시
-                document.getElementById('contractAddress').textContent = tokenAddress;
-                document.getElementById('tokenName').textContent = tokenInfo.name;
-                document.getElementById('tokenSymbol').textContent = tokenInfo.symbol;
-                document.getElementById('tokenDecimals').textContent = tokenInfo.decimals;
-                
-                // 가격 정보 표시
-                if (priceInfo) {
-                    document.getElementById('tokenPrice').textContent = 
-                        priceInfo.price < 0.01 ? `$${priceInfo.price.toFixed(8)}` : `$${priceInfo.price.toFixed(2)}`;
-                    document.getElementById('priceChange').textContent = 
-                        `${priceInfo.change24h > 0 ? '🟢' : '🔴'} ${priceInfo.change24h.toFixed(2)}%`;
-                    document.getElementById('marketCap').textContent = 
-                        `$${priceInfo.marketCap.toLocaleString()}`;
-                    document.getElementById('fdv').textContent = 
-                        `$${priceInfo.fdv.toLocaleString()}`;
-                } else {
-                    document.getElementById('tokenPrice').textContent = '$0.00';
-                    document.getElementById('priceChange').textContent = '⚪ 0.00%';
-                    document.getElementById('marketCap').textContent = '$0';
-                    document.getElementById('fdv').textContent = '$0';
-                }
-                
-                // 2. 지갑 잔고 조회
-                const chainWallets = wallets[chain] || {};
-                const walletEntries = Object.entries(chainWallets);
-                
-                // 진행 상태 표시
-                document.getElementById('progressSection').style.display = 'block';
-                
-                const balances = {};
-                let completedWallets = 0;
-                
-                for (const [name, address] of walletEntries) {
-                    try {
-                        const balance = await getTokenBalanceRPC(tokenAddress, address, tokenInfo.decimals);
-                        
-                        if (balance > 0) {
-                            balances[name] = balance;
-                            console.log(`✅ ${name}: ${balance.toLocaleString()} ${tokenInfo.symbol}`);
-                        }
-                        
-                        completedWallets++;
-                        const progress = (completedWallets / walletEntries.length) * 100;
-                        document.getElementById('progressText').textContent = `지갑 조회 중... (${completedWallets}/${walletEntries.length})`;
-                        document.getElementById('progressFill').style.width = `${progress}%`;
-                        
-                        // 잠시 대기 (RPC 과부하 방지)
-                        await new Promise(resolve => setTimeout(resolve, 100));
-                        
-                    } catch (error) {
-                        console.error(`${name} 조회 실패:`, error);
-                        completedWallets++;
-                    }
-                }
-                
-                // 결과 표시
-                displayResults(balances, priceInfo ? priceInfo.price : 0);
-                
-                // 진행 상태 숨기기
-                setTimeout(() => {
-                    document.getElementById('progressSection').style.display = 'none';
-                }, 1000);
-                
-            } catch (error) {
-                showError('조회 중 오류가 발생했습니다.');
-                console.error(error);
-            } finally {
-                showLoading(false);
-                isSearching = false;
-            }
-        }
-
-        // 결과 표시
-        function displayResults(balances, tokenPrice = 0) {
-            if (Object.keys(balances).length === 0) {
-                showError('거래소에서 해당 토큰을 찾을 수 없습니다.');
-                return;
-            }
-            
-            // 통계 계산
-            let cexTotal = 0, dexTotal = 0;
-            const sortedBalances = Object.entries(balances).sort((a, b) => b[1] - a[1]);
-            
-            sortedBalances.forEach(([name, balance]) => {
-                if (name.includes('swap') || name.includes('DEX')) {
-                    dexTotal += balance;
-                } else {
-                    cexTotal += balance;
-                }
-            });
-            
-            const totalBalance = cexTotal + dexTotal;
-            
-            // 통계 표시
-            document.getElementById('cexTotal').textContent = cexTotal.toLocaleString();
-            document.getElementById('dexTotal').textContent = dexTotal.toLocaleString();
-            document.getElementById('cexValue').textContent = '$' + (cexTotal * tokenPrice).toLocaleString();
-            document.getElementById('dexValue').textContent = '$' + (dexTotal * tokenPrice).toLocaleString();
-            document.getElementById('totalBalance').textContent = totalBalance.toLocaleString();
-            document.getElementById('totalValue').textContent = '$' + (totalBalance * tokenPrice).toLocaleString();
-            
-            // 차트 업데이트
-            updateChart(sortedBalances, totalBalance);
-            
-            // 테이블 채우기
-            fillTable(sortedBalances);
-        }
-
-        // 차트 업데이트
-        function updateChart(balances, total) {
-            const ctx = document.getElementById('chartCanvas').getContext('2d');
-            
-            const labels = [];
-            const data = [];
-            const colors = [];
-            
-            const displayBalances = balances.slice(0, 10);
-            
-            displayBalances.forEach(([name, balance]) => {
-                labels.push(name);
-                data.push(balance);
-                colors.push(getRandomColor());
-            });
-            
-            if (!chart) {
-                chart = new Chart(ctx, {
-                    type: 'doughnut',
-                    data: {
-                        labels: labels,
-                        datasets: [{
-                            data: data,
-                            backgroundColor: colors,
-                            borderWidth: 0
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: {
-                                display: true,
-                                position: 'right',
-                                labels: {
-                                    color: '#ffffff',
-                                    generateLabels: function(chart) {
-                                        const data = chart.data;
-                                        if (data.labels.length && data.datasets.length) {
-                                            return data.labels.map((label, i) => {
-                                                const value = data.datasets[0].data[i];
-                                                const percentage = ((value / total) * 100).toFixed(1);
-                                                return {
-                                                    text: `${label}: ${value.toLocaleString()} (${percentage}%)`,
-                                                    fillStyle: data.datasets[0].backgroundColor[i],
-                                                    strokeStyle: data.datasets[0].backgroundColor[i],
-                                                    fontColor: '#ffffff',
-                                                    index: i
-                                                };
-                                            });
-                                        }
-                                        return [];
-                                    }
-                                }
-                            },
-                            title: {
-                                display: true,
-                                text: `${document.getElementById('chainSelect').value} Chain - Token Distribution`,
-                                color: '#ffffff',
-                                font: {
-                                    size: 16
-                                }
-                            }
-                        }
-                    }
-                });
-            } else {
-                chart.data.labels = labels;
-                chart.data.datasets[0].data = data;
-                chart.data.datasets[0].backgroundColor = colors;
-                chart.update();
-            }
-        }
-
-        // 테이블 채우기
-        function fillTable(balances) {
-            const tbody = document.getElementById('tableBody');
-            tbody.innerHTML = '';
-            
-            balances.forEach(([name, balance], index) => {
-                const chain = document.getElementById('chainSelect').value;
-                const address = wallets[chain][name] || '0x0000000000000000000000000000000000000000';
-                const row = tbody.insertRow();
-                row.innerHTML = `
-                    <td>${index + 1}</td>
-                    <td>${name}</td>
-                    <td>${address}</td>
-                    <td>${balance.toLocaleString()}</td>
-                `;
-            });
-        }
-
-        // 결과 초기화
-        function resetResults() {
-            const searchingHTML = '<span class="searching-indicator">검색 중...</span>';
-            
-            document.getElementById('tokenName').innerHTML = searchingHTML;
-            document.getElementById('tokenSymbol').innerHTML = searchingHTML;
-            document.getElementById('tokenDecimals').innerHTML = searchingHTML;
-            document.getElementById('contractAddress').textContent = '-';
-            document.getElementById('tokenPrice').innerHTML = searchingHTML;
-            document.getElementById('priceChange').innerHTML = searchingHTML;
-            document.getElementById('marketCap').innerHTML = searchingHTML;
-            document.getElementById('fdv').innerHTML = searchingHTML;
-            document.getElementById('cexTotal').textContent = '0';
-            document.getElementById('dexTotal').textContent = '0';
-            document.getElementById('cexValue').textContent = '$0';
-            document.getElementById('dexValue').textContent = '$0';
-            document.getElementById('totalBalance').textContent = '0';
-            document.getElementById('totalValue').textContent = '$0';
-            document.getElementById('tableBody').innerHTML = '';
-        }
-
-        // 유틸리티 함수들
-        function showLoading(show) {
-            document.getElementById('loading').style.display = show ? 'block' : 'none';
-        }
-
-        function showError(message) {
-            const errorDiv = document.getElementById('error');
-            errorDiv.textContent = message;
-            errorDiv.style.display = 'block';
-        }
-
-        function hideError() {
-            document.getElementById('error').style.display = 'none';
-        }
-
-        function getRandomColor() {
-            const colors = [
-                '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF',
-                '#FF9F40', '#FF6384', '#C9CBCF', '#4BC0C0', '#36A2EB'
-            ];
-            return colors[Math.floor(Math.random() * colors.length)];
+            await WalletManager.addWallet();
         }
 
         // Enter 키 지원
-        document.getElementById('tokenInput').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                searchToken();
-            }
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('tokenInput').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    searchToken();
+                }
+            });
+            
+            // 초기 네이티브 버튼 설정
+            updateNativeTokenButtons();
         });
 
-        // 페이지 로드시 초기화 (Firebase 연동)
+        // 🚀 애플리케이션 초기화
         window.onload = async function() {
-            console.log('🚀 RPC 기반 대시보드 시작 - Firebase 연결 중...');
+            console.log('🚀 핫월렛 대시보드 시작...');
             
-            // Firebase에서 지갑 데이터 로드
-            await loadWalletsFromFirebase();
+            Utils.updateConnectionStatus('connecting', '시스템 초기화 중...');
             
-            console.log('🔥 Firebase 연결 완료 - Alchemy RPC 준비됨');
-        };
-    </script>
-</body>
-</html>
+            try {
+                // Firebase 초기화
+                const firebaseOk = await FirebaseManager.initialize();
+                
+                if (firebaseOk) {
+                    // Firebase에서 지갑 데이터 로드
+                    await FirebaseManager.loadWallets();
+                } else
