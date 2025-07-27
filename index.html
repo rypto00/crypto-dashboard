@@ -420,14 +420,6 @@
             max-height: 350px;
         }
 
-        .chain-progress {
-            margin-bottom: 15px;
-        }
-
-        .chain-progress .progress-bar {
-            height: 8px;
-        }
-
         .status-indicator {
             display: inline-block;
             width: 12px;
@@ -528,41 +520,6 @@
             <div class="progress-step" id="step4">
                 <span>4. 지갑 잔고 조회</span>
                 <span>⏳</span>
-            </div>
-            
-            <!-- 멀티체인 진행률 표시 -->
-            <div id="multiChainProgress" style="display: none; margin-top: 15px;">
-                <h5>🌐 체인별 진행률</h5>
-                <div class="chain-progress" id="ethProgress">
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                        <span>ETH Chain</span>
-                        <span id="ethPercent">0%</span>
-                    </div>
-                    <div class="progress-bar">
-                        <div class="progress-fill" id="ethFill"></div>
-                    </div>
-                </div>
-                <div class="chain-progress" id="bscProgress">
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                        <span>BSC Chain</span>
-                        <span id="bscPercent">0%</span>
-                    </div>
-                    <div class="progress-bar">
-                        <div class="progress-fill" id="bscFill"></div>
-                    </div>
-                </div>
-                <div class="chain-progress" id="polygonProgress">
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                        <span>Polygon Chain</span>
-                        <span id="polygonPercent">0%</span>
-                    </div>
-                    <div class="progress-bar">
-                        <div class="progress-fill" id="polygonFill"></div>
-                    </div>
-                </div>
-                <div style="margin-top: 10px; text-align: center; color: #aaa;">
-                    <span id="overallProgress">전체 진행률: 0% (예상 남은 시간: 계산 중...)</span>
-                </div>
             </div>
         </div>
 
@@ -1136,213 +1093,50 @@
             }
         }
 
-        // 🚀 슈퍼 병렬 잔고 조회 (멀티체인 + 대용량 배치)
-        async function getSuperParallelBalances(tokenAddress, tokenInfo, isMultiChain = false) {
+        // 🚀 병렬 잔고 조회
+        async function getBalancesParallel(tokenAddress, wallets, decimals, batchSize = 10) {
             updateProgressStep('step4', 'active', '4. 지갑 잔고 조회 중...');
             
-            const startTime = Date.now();
-            let searchChains = [];
-            
-            if (isMultiChain) {
-                // EVM 통합 검색 모드
-                searchChains = ['ETH', 'BSC', 'Polygon'];
-                document.getElementById('multiChainProgress').style.display = 'block';
-            } else {
-                // 단일 체인 모드
-                searchChains = [currentChain];
-            }
-            
-            console.log(`🚀 슈퍼 병렬 검색 시작: ${searchChains.length}개 체인`);
-            
-            const allResults = {};
-            const chainPromises = [];
-            
-            // 체인별 병렬 실행
-            for (const chain of searchChains) {
-                const chainWallets = wallets[chain] || {};
-                const walletCount = Object.keys(chainWallets).length;
-                
-                if (walletCount === 0) continue;
-                
-                console.log(`📡 ${chain} 체인: ${walletCount}개 지갑 검색 시작`);
-                
-                const chainPromise = processChainBalances(
-                    chain, 
-                    tokenAddress, 
-                    chainWallets, 
-                    tokenInfo.decimals,
-                    startTime
-                );
-                
-                chainPromises.push(chainPromise);
-            }
-            
-            // 모든 체인 동시 실행 및 결과 수집
-            const chainResults = await Promise.all(chainPromises);
-            
-            // 결과 통합
-            chainResults.forEach(({ chain, balances }) => {
-                if (Object.keys(balances).length > 0) {
-                    Object.entries(balances).forEach(([name, balance]) => {
-                        const displayName = isMultiChain ? `${name}_${chain}` : name;
-                        allResults[displayName] = balance;
-                    });
-                }
-            });
-            
-            const endTime = Date.now();
-            const totalTime = ((endTime - startTime) / 1000).toFixed(1);
-            
-            updateProgressStep('step4', 'completed', `4. 지갑 잔고 조회 완료 (${totalTime}초)`);
-            console.log(`✅ 슈퍼 병렬 검색 완료: ${totalTime}초, ${Object.keys(allResults).length}개 발견`);
-            
-            // 멀티체인 진행률 숨기기
-            setTimeout(() => {
-                document.getElementById('multiChainProgress').style.display = 'none';
-            }, 2000);
-            
-            return allResults;
-        }
-
-        // 🔗 체인별 잔고 처리 (대용량 배치 + 진행률 표시)
-        async function processChainBalances(chain, tokenAddress, chainWallets, decimals, startTime) {
-            const walletEntries = Object.entries(chainWallets);
-            const totalWallets = walletEntries.length;
-            const batchSize = 100; // 10배 증가!
+            const walletEntries = Object.entries(wallets);
             const results = {};
             let completed = 0;
-            
-            // 해당 체인용 Web3 연결
-            const chainWeb3 = await getChainWeb3(chain);
-            
-            console.log(`🚀 ${chain}: ${totalWallets}개 지갑을 배치 ${batchSize}개씩 처리`);
-            
-            // 대용량 배치로 병렬 처리
-            for (let i = 0; i < totalWallets; i += batchSize) {
+
+            for (let i = 0; i < walletEntries.length; i += batchSize) {
                 const batch = walletEntries.slice(i, i + batchSize);
                 
                 const batchPromises = batch.map(async ([name, address]) => {
                     try {
-                        const balance = await getTokenBalanceWithWeb3(
-                            chainWeb3, 
-                            tokenAddress, 
-                            address, 
-                            decimals
-                        );
-                        
+                        const balance = await getTokenBalance(tokenAddress, address, decimals);
                         completed++;
-                        updateChainProgress(chain, completed, totalWallets, startTime);
+                        
+                        const progress = (completed / walletEntries.length) * 100;
+                        document.getElementById('progressText').textContent = 
+                            `지갑 조회 중... (${completed}/${walletEntries.length})`;
+                        document.getElementById('progressFill').style.width = `${progress}%`;
                         
                         return { name, balance };
                     } catch (error) {
                         completed++;
-                        updateChainProgress(chain, completed, totalWallets, startTime);
+                        console.error(`${name} 조회 실패:`, error);
                         return { name, balance: 0 };
                     }
                 });
 
                 const batchResults = await Promise.all(batchPromises);
                 
-                // 잔고가 있는 것만 저장
                 batchResults.forEach(({ name, balance }) => {
                     if (balance > 0) {
                         results[name] = balance;
-                        console.log(`💰 ${chain} - ${name}: ${balance.toLocaleString()}`);
                     }
                 });
 
-                // 대기시간 대폭 단축: 50ms → 10ms
-                if (i + batchSize < totalWallets) {
-                    await new Promise(resolve => setTimeout(resolve, 10));
+                if (i + batchSize < walletEntries.length) {
+                    await new Promise(resolve => setTimeout(resolve, 50));
                 }
             }
-            
-            return { chain, balances: results };
-        }
 
-        // 🌐 체인별 Web3 인스턴스 가져오기
-        async function getChainWeb3(chain) {
-            const RPC_ENDPOINTS = {
-                ETH: 'https://eth.llamarpc.com',
-                BSC: 'https://bsc-dataseed.binance.org/',
-                Polygon: 'https://polygon-rpc.com'
-            };
-            
-            const rpcUrl = RPC_ENDPOINTS[chain];
-            const chainWeb3 = new Web3(rpcUrl);
-            
-            // 연결 테스트
-            await chainWeb3.eth.getBlockNumber();
-            
-            return chainWeb3;
-        }
-
-        // 💳 Web3 인스턴스를 사용한 토큰 잔고 조회
-        async function getTokenBalanceWithWeb3(web3Instance, tokenAddress, walletAddress, decimals) {
-            try {
-                if (tokenAddress === '0x0000000000000000000000000000000000000000') {
-                    const balance = await web3Instance.eth.getBalance(walletAddress);
-                    return parseFloat(web3Instance.utils.fromWei(balance, 'ether'));
-                } else {
-                    const contract = new web3Instance.eth.Contract(ERC20_ABI, tokenAddress);
-                    const balance = await contract.methods.balanceOf(walletAddress).call();
-                    
-                    if (balance && balance !== '0') {
-                        return parseFloat(balance) / Math.pow(10, decimals);
-                    }
-                    return 0;
-                }
-            } catch (error) {
-                return 0;
-            }
-        }
-
-        // 📊 체인별 진행률 업데이트
-        function updateChainProgress(chain, completed, total, startTime) {
-            const percent = Math.round((completed / total) * 100);
-            const elapsed = (Date.now() - startTime) / 1000;
-            const rate = completed / elapsed;
-            const remaining = (total - completed) / rate;
-            const remainingText = remaining > 60 ? 
-                `${Math.round(remaining / 60)}분` : 
-                `${Math.round(remaining)}초`;
-            
-            // 체인별 진행률 업데이트
-            const chainKey = chain.toLowerCase();
-            document.getElementById(`${chainKey}Percent`).textContent = `${percent}%`;
-            document.getElementById(`${chainKey}Fill`).style.width = `${percent}%`;
-            
-            // 전체 진행률 계산 (간단히 평균으로)
-            updateOverallProgress(startTime);
-        }
-
-        // 📊 전체 진행률 업데이트
-        function updateOverallProgress(startTime) {
-            const chains = ['eth', 'bsc', 'polygon'];
-            let totalPercent = 0;
-            let activeChains = 0;
-            
-            chains.forEach(chain => {
-                const element = document.getElementById(`${chain}Percent`);
-                if (element && element.textContent !== '0%') {
-                    const percent = parseInt(element.textContent);
-                    if (!isNaN(percent)) {
-                        totalPercent += percent;
-                        activeChains++;
-                    }
-                }
-            });
-            
-            const overallPercent = activeChains > 0 ? Math.round(totalPercent / activeChains) : 0;
-            const elapsed = (Date.now() - startTime) / 1000;
-            const estimatedTotal = elapsed / (overallPercent / 100);
-            const remaining = Math.max(0, estimatedTotal - elapsed);
-            const remainingText = remaining > 60 ? 
-                `${Math.round(remaining / 60)}분` : 
-                `${Math.round(remaining)}초`;
-            
-            document.getElementById('overallProgress').textContent = 
-                `전체 진행률: ${overallPercent}% (예상 남은 시간: ${remainingText})`;
+            updateProgressStep('step4', 'completed', '4. 지갑 잔고 조회 완료');
+            return results;
         }
 
         // 📊 결과 표시
@@ -1509,14 +1303,14 @@
             document.getElementById('tableBody').innerHTML = '';
         }
 
-        // 🚀 메인 검색 함수 (멀티체인 지원)
+        // 🚀 메인 검색 함수
         async function searchToken() {
             if (isSearching) {
                 showMessage('warning', '이미 검색 중입니다. 잠시만 기다려주세요.');
                 return;
             }
             
-            const searchMode = document.getElementById('chainSelect').value;
+            const chain = document.getElementById('chainSelect').value;
             const input = document.getElementById('tokenInput').value.trim();
             
             if (!input) {
@@ -1535,16 +1329,7 @@
             resetResults();
             
             let tokenAddress = input;
-            let searchChain = currentChain;
-            const isMultiChain = searchMode === 'multi';
             
-            // 검색 모드 결정
-            if (!isMultiChain) {
-                searchChain = document.getElementById('specificChain').value || 'ETH';
-                currentChain = searchChain;
-            }
-            
-            // 네이티브 토큰 처리
             if (!input.startsWith('0x')) {
                 const nativeTokens = {
                     ETH: ['ETH', 'ETHEREUM'],
@@ -1552,23 +1337,10 @@
                     Polygon: ['MATIC', 'POLYGON']
                 };
                 
-                let isNative = false;
-                if (isMultiChain) {
-                    // 멀티체인에서는 ETH, BNB, MATIC 모두 허용
-                    const allNative = Object.values(nativeTokens).flat();
-                    if (allNative.includes(input.toUpperCase())) {
-                        tokenAddress = '0x0000000000000000000000000000000000000000';
-                        isNative = true;
-                    }
+                const chainTokens = nativeTokens[chain] || [];
+                if (chainTokens.includes(input.toUpperCase())) {
+                    tokenAddress = '0x0000000000000000000000000000000000000000';
                 } else {
-                    const chainTokens = nativeTokens[searchChain] || [];
-                    if (chainTokens.includes(input.toUpperCase())) {
-                        tokenAddress = '0x0000000000000000000000000000000000000000';
-                        isNative = true;
-                    }
-                }
-                
-                if (!isNative) {
                     showMessage('error', `${input} 토큰의 컨트랙트 주소를 직접 입력하세요.`);
                     isSearching = false;
                     document.getElementById('searchBtn').disabled = false;
@@ -1578,36 +1350,39 @@
             }
             
             try {
-                console.log(`🚀 ${isMultiChain ? '멀티체인' : searchChain} 모드로 ${tokenAddress} 검색 시작`);
+                console.log(`🚀 ${chain} 체인에서 ${tokenAddress} 검색 시작`);
                 
-                // 1. 블록체인 연결 (첫 번째 체인 또는 현재 체인)
-                const connectChain = isMultiChain ? 'ETH' : searchChain;
-                await connectToChain(connectChain);
+                await connectToChain(chain);
                 
-                // 2. 토큰 정보와 가격 정보 병렬로 가져오기
                 const [tokenInfo, priceInfo] = await Promise.all([
                     getTokenInfo(tokenAddress),
-                    getTokenPrice(tokenAddress, connectChain)
+                    getTokenPrice(tokenAddress, chain)
                 ]);
                 
-                // 토큰 정보 표시
                 displayTokenInfo(tokenInfo, tokenAddress);
                 displayPriceInfo(priceInfo);
                 
-                // 3. 슈퍼 병렬 잔고 조회
-                const balances = await getSuperParallelBalances(
+                const chainWallets = wallets[chain] || {};
+                
+                if (Object.keys(chainWallets).length === 0) {
+                    throw new Error(`${chain} 체인에 등록된 지갑이 없습니다.`);
+                }
+                
+                document.getElementById('progressSection').style.display = 'block';
+                
+                const balances = await getBalancesParallel(
                     tokenAddress, 
-                    tokenInfo, 
-                    isMultiChain
+                    chainWallets, 
+                    tokenInfo.decimals,
+                    10
                 );
                 
-                // 결과 표시
                 displayBalances(balances, priceInfo ? priceInfo.price : 0);
                 
-                // 진행 상태 숨기기
                 setTimeout(() => {
+                    document.getElementById('progressSection').style.display = 'none';
                     document.getElementById('detailedProgress').style.display = 'none';
-                }, 3000);
+                }, 2000);
                 
             } catch (error) {
                 console.error('검색 오류:', error);
@@ -1615,11 +1390,11 @@
                 let errorMessage = '알 수 없는 오류가 발생했습니다.';
                 
                 if (error.message.includes('연결')) {
-                    errorMessage = `블록체인 연결에 실패했습니다. 잠시 후 다시 시도해주세요.`;
+                    errorMessage = `${chain} 블록체인 연결에 실패했습니다. 잠시 후 다시 시도해주세요.`;
                 } else if (error.message.includes('토큰 정보')) {
                     errorMessage = '유효하지 않은 토큰 주소입니다. 컨트랙트 주소를 확인해주세요.';
                 } else if (error.message.includes('지갑')) {
-                    errorMessage = `등록된 지갑이 없습니다. 지갑을 먼저 추가해주세요.`;
+                    errorMessage = `${chain} 체인에 등록된 지갑이 없습니다. 지갑을 먼저 추가해주세요.`;
                 } else {
                     errorMessage = error.message;
                 }
@@ -1632,23 +1407,34 @@
             }
         }
 
-        // 🔄 검색 모드 변경 처리
-        function updateSearchMode() {
-            const searchMode = document.getElementById('chainSelect').value;
-            const specificChain = document.getElementById('specificChain');
-            const chainHelp = document.getElementById('chainHelp');
+        // 🔸 네이티브 토큰 검색
+        function searchNativeToken() {
+            const chain = document.getElementById('chainSelect').value;
+            const nativeTokens = {
+                ETH: 'ETH',
+                BSC: 'BNB',
+                Polygon: 'MATIC'
+            };
             
-            if (searchMode === 'single') {
-                specificChain.style.display = 'inline-block';
-                chainHelp.textContent = '💡 단일 체인: 선택한 체인에서만 검색';
-                currentChain = specificChain.value || 'ETH';
-            } else {
-                specificChain.style.display = 'none';
-                chainHelp.textContent = '💡 EVM 통합 모드: ETH + BSC + Polygon 동시 검색 (빠름!)';
-            }
+            document.getElementById('tokenInput').value = nativeTokens[chain];
+            searchToken();
         }
 
-
+        // 🔄 네이티브 토큰 버튼 업데이트
+        function updateNativeTokenButtons() {
+            const chain = document.getElementById('chainSelect').value;
+            const nativeButtons = document.getElementById('nativeButtons');
+            
+            const nativeTokens = {
+                ETH: 'ETH',
+                BSC: 'BNB',
+                Polygon: 'MATIC'
+            };
+            
+            nativeButtons.innerHTML = `
+                <button class="native-btn" onclick="searchNativeToken()">${nativeTokens[chain]} 조회</button>
+            `;
+        }
 
         // 💼 지갑 관리 함수들
         function displayWallets() {
@@ -1778,15 +1564,7 @@
             try {
                 const firebaseOk = await initializeFirebase();
                 await loadWallets();
-                
-                // 검색 모드 변경 이벤트
-                document.getElementById('chainSelect').addEventListener('change', updateSearchMode);
-                document.getElementById('specificChain').addEventListener('change', function() {
-                    currentChain = this.value;
-                });
-                
-                // 초기 모드 설정
-                updateSearchMode();
+                updateNativeTokenButtons();
                 
                 // Enter 키 지원
                 document.getElementById('tokenInput').addEventListener('keypress', function(e) {
@@ -1795,7 +1573,7 @@
                     }
                 });
                 
-                console.log('✅ 슈퍼 병렬 대시보드 초기화 완료!');
+                console.log('✅ 대시보드 초기화 완료!');
                 
             } catch (error) {
                 console.error('초기화 오류:', error);
