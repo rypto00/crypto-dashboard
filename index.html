@@ -1374,42 +1374,227 @@
             document.getElementById('tableBody').innerHTML = '';
         }
 
-        // 🚀 검색 함수
-        function startSearch() {
-            console.log('🔍 검색 함수 호출됨!');
-            
-            if (isSearching) {
-                showMessage('warning', '이미 검색 중입니다.');
-                return;
-            }
-            
-            const input = document.getElementById('tokenInput').value.trim();
-            console.log('입력값:', input);
-            
-            if (!input) {
-                showMessage('error', '토큰 주소를 입력하세요.');
-                return;
-            }
-            
-            isSearching = true;
-            document.getElementById('searchBtn').disabled = true;
-            document.getElementById('detailedProgress').style.display = 'block';
-            document.getElementById('results').style.display = 'block';
-            
-            // 간단한 테스트 검색
-            updateProgressStep('step1', 'active', '1. 검색 시작...');
-            
-            setTimeout(() => {
-                updateProgressStep('step1', 'completed', '1. 검색 완료');
-                showMessage('success', '테스트 검색이 완료되었습니다!');
+        // 🌐 블록체인 연결
+        async function connectToChain(chain) {
+            try {
+                updateProgressStep('step1', 'active', '1. 블록체인 연결 중...');
                 
-                isSearching = false;
-                document.getElementById('searchBtn').disabled = false;
+                const allChains = getAllChains();
+                const chainInfo = allChains[chain];
                 
-                setTimeout(() => {
-                    document.getElementById('detailedProgress').style.display = 'none';
-                }, 2000);
-            }, 1000);
+                if (!chainInfo) {
+                    throw new Error(`지원하지 않는 체인입니다: ${chain}`);
+                }
+                
+                web3 = new Web3(chainInfo.rpc);
+                currentChain = chain;
+                
+                // 연결 테스트
+                await web3.eth.getBlockNumber();
+                
+                updateProgressStep('step1', 'completed', '1. 블록체인 연결 완료');
+                console.log(`🔗 ${chainInfo.name} 체인 연결 완료`);
+                return true;
+            } catch (error) {
+                updateProgressStep('step1', 'error', '1. 블록체인 연결 실패');
+                throw new Error(`${chain} 체인 연결 실패: ${error.message}`);
+            }
+        }
+
+        // 🪙 토큰 정보 조회
+        async function getTokenInfo(tokenAddress) {
+            try {
+                updateProgressStep('step2', 'active', '2. 토큰 정보 조회 중...');
+                
+                if (tokenAddress === '0x0000000000000000000000000000000000000000') {
+                    const allChains = getAllChains();
+                    const chainInfo = allChains[currentChain];
+                    
+                    if (chainInfo) {
+                        const result = {
+                            name: chainInfo.name,
+                            symbol: chainInfo.symbol,
+                            decimals: 18
+                        };
+                        updateProgressStep('step2', 'completed', '2. 토큰 정보 조회 완료');
+                        return result;
+                    }
+                }
+
+                console.log(`🔍 토큰 컨트랙트 조회: ${tokenAddress}`);
+                const contract = new web3.eth.Contract(ERC20_ABI, tokenAddress);
+                
+                let name = 'Unknown';
+                let symbol = 'UNKNOWN';
+                let decimals = 18;
+                
+                try {
+                    name = await contract.methods.name().call();
+                    console.log(`📛 토큰 이름: ${name}`);
+                } catch (e) {
+                    console.warn('토큰 이름 조회 실패:', e.message);
+                }
+                
+                try {
+                    symbol = await contract.methods.symbol().call();
+                    console.log(`🔤 토큰 심볼: ${symbol}`);
+                } catch (e) {
+                    console.warn('토큰 심볼 조회 실패:', e.message);
+                }
+                
+                try {
+                    decimals = await contract.methods.decimals().call();
+                    decimals = parseInt(decimals);
+                    console.log(`🔢 토큰 소수점: ${decimals}`);
+                } catch (e) {
+                    console.warn('토큰 소수점 조회 실패, 기본값 18 사용:', e.message);
+                    decimals = 18;
+                }
+
+                updateProgressStep('step2', 'completed', '2. 토큰 정보 조회 완료');
+                
+                const result = {
+                    name: name || 'Unknown',
+                    symbol: symbol || 'UNKNOWN',
+                    decimals: decimals
+                };
+                
+                console.log('📋 최종 토큰 정보:', result);
+                return result;
+                
+            } catch (error) {
+                updateProgressStep('step2', 'error', '2. 토큰 정보 조회 실패');
+                console.error('토큰 정보 조회 전체 실패:', error);
+                throw new Error(`토큰 정보 조회 실패: ${error.message}`);
+            }
+        }
+
+        // 💰 가격 정보 조회
+        async function getTokenPrice(tokenAddress, chain) {
+            try {
+                updateProgressStep('step3', 'active', '3. 가격 정보 조회 중...');
+                
+                let geckoId = '';
+                
+                if (tokenAddress === '0x0000000000000000000000000000000000000000') {
+                    const nativeIds = {
+                        ETH: 'ethereum',
+                        BSC: 'binancecoin',
+                        Polygon: 'matic-network'
+                    };
+                    geckoId = nativeIds[chain];
+                } else {
+                    const platformMap = {
+                        ETH: 'ethereum',
+                        BSC: 'binance-smart-chain',
+                        Polygon: 'polygon-pos'
+                    };
+                    
+                    const platform = platformMap[chain];
+                    const searchUrl = `https://api.coingecko.com/api/v3/coins/${platform}/contract/${tokenAddress}`;
+                    
+                    try {
+                        const response = await fetch(searchUrl);
+                        if (response.ok) {
+                            const tokenData = await response.json();
+                            geckoId = tokenData.id;
+                        }
+                    } catch (e) {
+                        console.log('토큰 검색 실패:', e);
+                    }
+                }
+                
+                if (geckoId) {
+                    const priceUrl = `https://api.coingecko.com/api/v3/simple/price?ids=${geckoId}&vs_currencies=usd&include_market_cap=true&include_24hr_change=true`;
+                    const response = await fetch(priceUrl);
+                    const priceData = await response.json();
+                    
+                    if (priceData[geckoId]) {
+                        const detailUrl = `https://api.coingecko.com/api/v3/coins/${geckoId}`;
+                        const detailResponse = await fetch(detailUrl);
+                        const detailData = await detailResponse.json();
+                        
+                        updateProgressStep('step3', 'completed', '3. 가격 정보 조회 완료');
+                        
+                        return {
+                            price: priceData[geckoId].usd || 0,
+                            marketCap: priceData[geckoId].usd_market_cap || 0,
+                            change24h: priceData[geckoId].usd_24h_change || 0,
+                            fdv: detailData.market_data?.fully_diluted_valuation?.usd || priceData[geckoId].usd_market_cap || 0
+                        };
+                    }
+                }
+                
+                updateProgressStep('step3', 'completed', '3. 가격 정보 조회 완료 (가격 없음)');
+                return null;
+            } catch (error) {
+                updateProgressStep('step3', 'error', '3. 가격 정보 조회 실패');
+                console.error('가격 정보 조회 실패:', error);
+                return null;
+            }
+        }
+
+        // 💳 토큰 잔고 조회
+        async function getTokenBalance(tokenAddress, walletAddress, decimals) {
+            try {
+                if (tokenAddress === '0x0000000000000000000000000000000000000000') {
+                    const balance = await web3.eth.getBalance(walletAddress);
+                    return parseFloat(web3.utils.fromWei(balance, 'ether'));
+                } else {
+                    const contract = new web3.eth.Contract(ERC20_ABI, tokenAddress);
+                    const balance = await contract.methods.balanceOf(walletAddress).call();
+                    
+                    if (balance && balance !== '0') {
+                        return parseFloat(balance) / Math.pow(10, decimals);
+                    }
+                    return 0;
+                }
+            } catch (error) {
+                console.error(`잔고 조회 실패 (${walletAddress}):`, error);
+                return 0;
+            }
+        }
+
+        // 🚀 병렬 잔고 조회
+        async function getBalancesParallel(tokenAddress, chainWallets, decimals) {
+            updateProgressStep('step4', 'active', '4. 지갑 잔고 조회 중...');
+            
+            const walletEntries = Object.entries(chainWallets);
+            const results = {};
+            let completed = 0;
+            const batchSize = 10;
+
+            for (let i = 0; i < walletEntries.length; i += batchSize) {
+                const batch = walletEntries.slice(i, i + batchSize);
+                
+                const batchPromises = batch.map(async ([name, address]) => {
+                    try {
+                        const balance = await getTokenBalance(tokenAddress, address, decimals);
+                        completed++;
+                        console.log(`💰 ${name}: ${balance.toLocaleString()} (${completed}/${walletEntries.length})`);
+                        return { name, balance };
+                    } catch (error) {
+                        completed++;
+                        console.error(`${name} 조회 실패:`, error);
+                        return { name, balance: 0 };
+                    }
+                });
+
+                const batchResults = await Promise.all(batchPromises);
+                
+                batchResults.forEach(({ name, balance }) => {
+                    if (balance > 0) {
+                        results[name] = balance;
+                    }
+                });
+
+                if (i + batchSize < walletEntries.length) {
+                    await new Promise(resolve => setTimeout(resolve, 50));
+                }
+            }
+
+            updateProgressStep('step4', 'completed', '4. 지갑 잔고 조회 완료');
+            return results;
         }
 
         // 🚀 초기화
