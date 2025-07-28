@@ -883,8 +883,8 @@
     </div>
 
     <script>
-        // 전역 변수 선언 (메타마스크 충돌 방지)
-        window.addEventListener('load', function() {
+        // 전역 변수들을 즉시 실행 함수로 감싸서 전역 스코프 오염 방지
+        (function() {
             // 전역 상태 관리
             let walletsData = {};
             let web3Instances = {};
@@ -1035,13 +1035,14 @@
                 document.getElementById(type).style.display = 'none';
             }
 
-            function updateProgressStep(stepId, status, message = '') {
+            function updateProgressStep(stepId, status, message) {
+                message = message || '';
                 const step = document.getElementById(stepId);
                 if (!step) return;
                 
                 const statusIcon = step.querySelector('span:last-child');
                 
-                step.className = `progress-step ${status}`;
+                step.className = 'progress-step ' + status;
                 
                 switch(status) {
                     case 'active':
@@ -1088,10 +1089,7 @@
                     const status = rpcStatus[rpc.url] || 'unknown';
                     const statusDiv = document.createElement('div');
                     statusDiv.className = 'rpc-status';
-                    statusDiv.innerHTML = `
-                        <div class="rpc-indicator ${status}"></div>
-                        <span>${rpc.name}</span>
-                    `;
+                    statusDiv.innerHTML = '<div class="rpc-indicator ' + status + '"></div><span>' + rpc.name + '</span>';
                     indicator.appendChild(statusDiv);
                 });
             }
@@ -1106,28 +1104,24 @@
                 chainConfig.rpcs.forEach((rpc, index) => {
                     const progressItem = document.createElement('div');
                     progressItem.className = 'rpc-progress-item';
-                    progressItem.id = `rpc-progress-${index}`;
-                    progressItem.innerHTML = `
-                        <span>${rpc.name} (${rpc.speed})</span>
-                        <div>
-                            <span class="rpc-speed">대기 중...</span>
-                            <span>⏳</span>
-                        </div>
-                    `;
+                    progressItem.id = 'rpc-progress-' + index;
+                    progressItem.innerHTML = '<span>' + rpc.name + ' (' + rpc.speed + ')</span><div><span class="rpc-speed">대기 중...</span><span>⏳</span></div>';
                     progressList.appendChild(progressItem);
                 });
                 
                 progressDiv.style.display = 'block';
             }
 
-            function updateRpcProgress(rpcIndex, status, message = '', speed = '') {
-                const progressItem = document.getElementById(`rpc-progress-${rpcIndex}`);
+            function updateRpcProgress(rpcIndex, status, message, speed) {
+                message = message || '';
+                speed = speed || '';
+                const progressItem = document.getElementById('rpc-progress-' + rpcIndex);
                 if (!progressItem) return;
                 
                 const statusIcon = progressItem.querySelector('span:last-child');
                 const speedSpan = progressItem.querySelector('.rpc-speed');
                 
-                progressItem.className = `rpc-progress-item ${status}`;
+                progressItem.className = 'rpc-progress-item ' + status;
                 
                 switch(status) {
                     case 'active':
@@ -1136,7 +1130,7 @@
                         break;
                     case 'completed':
                         statusIcon.textContent = '✅';
-                        speedSpan.textContent = speed ? `완료 (${speed})` : '완료';
+                        speedSpan.textContent = speed ? '완료 (' + speed + ')' : '완료';
                         break;
                     case 'error':
                         statusIcon.textContent = '❌';
@@ -1151,7 +1145,7 @@
                 document.querySelectorAll('.threshold-presets button').forEach(btn => {
                     btn.classList.remove('active');
                 });
-                const targetBtn = document.querySelector(`[data-threshold="${value}"]`);
+                const targetBtn = document.querySelector('[data-threshold="' + value + '"]');
                 if (targetBtn) {
                     targetBtn.classList.add('active');
                 }
@@ -1272,11 +1266,7 @@
 
             // CSV 관련 함수들
             function downloadTemplate() {
-                const csvContent = `name,address
-Example_Exchange1,0x0000000000000000000000000000000000000001
-Example_Exchange2,0x0000000000000000000000000000000000000002
-Example_Exchange3,0x0000000000000000000000000000000000000003
-Example_Exchange4,0x0000000000000000000000000000000000000004`;
+                const csvContent = 'name,address\nExample_Exchange1,0x0000000000000000000000000000000000000001\nExample_Exchange2,0x0000000000000000000000000000000000000002\nExample_Exchange3,0x0000000000000000000000000000000000000003\nExample_Exchange4,0x0000000000000000000000000000000000000004';
                 
                 const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
                 const link = document.createElement('a');
@@ -1448,10 +1438,10 @@ Example_Exchange4,0x0000000000000000000000000000000000000004`;
                                     web3Instances[rpc.url] = web3;
                                     rpcStatus[rpc.url] = 'active';
                                     
-                                    console.log(`${rpc.name} 연결 성공 (${responseTime}ms)`);
+                                    console.log(rpc.name + ' 연결 성공 (' + responseTime + 'ms)');
                                     return { index, success: true, responseTime, rpc };
                                 } catch (error) {
-                                    console.error(`${rpc.name} 연결 실패:`, error.message);
+                                    console.error(rpc.name + ' 연결 실패:', error.message);
                                     rpcStatus[rpc.url] = 'error';
                                     return { index, success: false, error: error.message, rpc };
                                 }
@@ -1470,9 +1460,9 @@ Example_Exchange4,0x0000000000000000000000000000000000000004`;
                     updateRpcStatusDisplay(chain);
                     
                     updateProgressStep('step1', 'completed', 
-                        `1. 멀티 RPC 연결 완료 (${successfulConnections.length}/${chainConfig.rpcs.length})`);
+                        '1. 멀티 RPC 연결 완료 (' + successfulConnections.length + '/' + chainConfig.rpcs.length + ')');
                     
-                    console.log(`${chain} - ${successfulConnections.length}개 RPC 연결 성공`);
+                    console.log(chain + ' - ' + successfulConnections.length + '개 RPC 연결 성공');
                     return true;
                     
                 } catch (error) {
@@ -1674,7 +1664,7 @@ Example_Exchange4,0x0000000000000000000000000000000000000004`;
                 const rpcPromises = rpcWorkloads.map(async (workload) => {
                     const { rpcIndex, rpcUrl, web3Instance, wallets: rpcWallets, rpcName } = workload;
                     
-                    updateRpcProgress(rpcIndex, 'active', `${rpcWallets.length}개 지갑 처리 중`);
+                    updateRpcProgress(rpcIndex, 'active', rpcWallets.length + '개 지갑 처리 중');
                     
                     try {
                         const startTime = Date.now();
@@ -1689,13 +1679,13 @@ Example_Exchange4,0x0000000000000000000000000000000000000004`;
                                     
                                     const progress = (totalCompleted / totalWallets) * 100;
                                     document.getElementById('progressText').textContent = 
-                                        `멀티 RPC 조회 중... (${totalCompleted}/${totalWallets})`;
+                                        '멀티 RPC 조회 중... (' + totalCompleted + '/' + totalWallets + ')';
                                     document.getElementById('progressFill').style.width = progress + '%';
                                     
                                     return { name, balance };
                                 } catch (error) {
                                     totalCompleted++;
-                                    console.error(`${name} 조회 실패 (${rpcName}):`, error);
+                                    console.error(name + ' 조회 실패 (' + rpcName + '):', error);
                                     return { name, balance: 0 };
                                 }
                             });
@@ -1707,7 +1697,7 @@ Example_Exchange4,0x0000000000000000000000000000000000000004`;
                             });
                             
                             updateRpcProgress(rpcIndex, 'active', 
-                                `${Math.min(i + batchSize, rpcWallets.length)}/${rpcWallets.length} 완료`);
+                                Math.min(i + batchSize, rpcWallets.length) + '/' + rpcWallets.length + ' 완료');
                             
                             if (i + batchSize < rpcWallets.length) {
                                 await new Promise(resolve => setTimeout(resolve, 100));
@@ -1717,15 +1707,15 @@ Example_Exchange4,0x0000000000000000000000000000000000000004`;
                         const endTime = Date.now();
                         const duration = ((endTime - startTime) / 1000).toFixed(1);
                         
-                        updateRpcProgress(rpcIndex, 'completed', '', `${duration}초`);
+                        updateRpcProgress(rpcIndex, 'completed', '', duration + '초');
                         rpcStatus[rpcUrl] = 'active';
                         
-                        console.log(`${rpcName} 완료: ${rpcWallets.length}개 지갑 (${duration}초)`);
+                        console.log(rpcName + ' 완료: ' + rpcWallets.length + '개 지갑 (' + duration + '초)');
                         
                     } catch (error) {
                         updateRpcProgress(rpcIndex, 'error', error.message);
                         rpcStatus[rpcUrl] = 'error';
-                        console.error(`${rpcName} 오류:`, error);
+                        console.error(rpcName + ' 오류:', error);
                     }
                 });
                 
@@ -1736,7 +1726,7 @@ Example_Exchange4,0x0000000000000000000000000000000000000004`;
                 updateProgressStep('step4', 'completed', '4. 멀티 RPC 병렬 조회 완료');
                 
                 const successfulRpcs = Object.values(rpcStatus).filter(status => status === 'active').length;
-                console.log(`멀티 RPC 조회 완료: ${successfulRpcs}개 RPC 사용, ${totalWallets}개 지갑 조회`);
+                console.log('멀티 RPC 조회 완료: ' + successfulRpcs + '개 RPC 사용, ' + totalWallets + '개 지갑 조회');
                 
                 return results;
             }
@@ -1753,7 +1743,7 @@ Example_Exchange4,0x0000000000000000000000000000000000000004`;
             function displayPriceInfo(priceInfo) {
                 if (priceInfo) {
                     document.getElementById('tokenPrice').textContent = 
-                        priceInfo.price < 0.01 ? ' + priceInfo.price.toFixed(8) : ' + priceInfo.price.toFixed(2);
+                        (priceInfo.price < 0.01 ? ' + priceInfo.price.toFixed(8) : ' + priceInfo.price.toFixed(2));
                     document.getElementById('priceChange').innerHTML = 
                         (priceInfo.change24h > 0 ? '🟢' : '🔴') + ' ' + priceInfo.change24h.toFixed(2) + '%';
                     document.getElementById('marketCap').textContent = 
@@ -1768,7 +1758,8 @@ Example_Exchange4,0x0000000000000000000000000000000000000004`;
                 }
             }
 
-            function displayBalances(balances, tokenPrice = 0) {
+            function displayBalances(balances, tokenPrice) {
+                tokenPrice = tokenPrice || 0;
                 const minThreshold = parseFloat(document.getElementById('minBalanceInput').value) || 0;
                 const queryDuration = ((Date.now() - queryStartTime) / 1000).toFixed(1);
                 
@@ -1825,7 +1816,7 @@ Example_Exchange4,0x0000000000000000000000000000000000000004`;
                 updateChart(sortedFilteredEntries, totalFilteredBalance);
                 
                 showMessage('success', 
-                    `⚡ 멀티 RPC로 ${allEntries.length}개 거래소 중 ${filteredEntries.length}개가 ${minThreshold}개 이상 보유 (${queryDuration}초 소요)!`
+                    '⚡ 멀티 RPC로 ' + allEntries.length + '개 거래소 중 ' + filteredEntries.length + '개가 ' + minThreshold + '개 이상 보유 (' + queryDuration + '초 소요)!'
                 );
                 
                 setTimeout(() => {
@@ -2002,7 +1993,7 @@ Example_Exchange4,0x0000000000000000000000000000000000000004`;
                 }
                 
                 try {
-                    console.log(`🚀 ${chain} 체인에서 ${tokenAddress} 멀티 RPC 검색 시작`);
+                    console.log('🚀 ' + chain + ' 체인에서 ' + tokenAddress + ' 멀티 RPC 검색 시작');
                     
                     await connectToMultiRpc(chain);
                     
@@ -2350,7 +2341,7 @@ Example_Exchange4,0x0000000000000000000000000000000000000004`;
             } else {
                 initialize();
             }
-        });
+        })();
     </script>
 </body>
 </html>
