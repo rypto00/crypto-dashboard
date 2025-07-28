@@ -610,15 +610,15 @@
             </div>
             <div class="search-row">
                 <select id="chainSelect">
-                    <option value="ETH">Ethereum <span class="chain-badge eth">ETH</span></option>
-                    <option value="BSC">BSC <span class="chain-badge bsc">BNB</span></option>
-                    <option value="Polygon">Polygon <span class="chain-badge polygon">MATIC</span></option>
-                    <option value="Arbitrum">Arbitrum <span class="chain-badge arbitrum">ARB</span></option>
-                    <option value="Optimism">Optimism <span class="chain-badge optimism">OP</span></option>
-                    <option value="Avalanche">Avalanche <span class="chain-badge avalanche">AVAX</span></option>
+                    <option value="ETH">Ethereum</option>
+                    <option value="BSC">BSC</option>
+                    <option value="Polygon">Polygon</option>
+                    <option value="Arbitrum">Arbitrum</option>
+                    <option value="Optimism">Optimism</option>
+                    <option value="Avalanche">Avalanche</option>
                 </select>
                 <input type="text" id="tokenInput" placeholder="토큰 컨트랙트 주소 (0x...) 또는 네이티브 토큰명 (ETH, BNB, MATIC 등)">
-                <button id="searchBtn" onclick="searchToken()">🔍 조회</button>
+                <button id="searchBtn">🔍 조회</button>
             </div>
 
             <!-- 임계값 설정 섹션 -->
@@ -628,12 +628,12 @@
                 <span style="color: #aaa;">개 이상만 표시</span>
                 
                 <div class="threshold-presets">
-                    <button onclick="setThreshold(0)" data-threshold="0">전체</button>
-                    <button onclick="setThreshold(1)" data-threshold="1">1↑</button>
-                    <button onclick="setThreshold(10)" data-threshold="10">10↑</button>
-                    <button onclick="setThreshold(50)" data-threshold="50" class="active">50↑</button>
-                    <button onclick="setThreshold(100)" data-threshold="100">100↑</button>
-                    <button onclick="setThreshold(1000)" data-threshold="1000">1K↑</button>
+                    <button data-threshold="0">전체</button>
+                    <button data-threshold="1">1↑</button>
+                    <button data-threshold="10">10↑</button>
+                    <button data-threshold="50" class="active">50↑</button>
+                    <button data-threshold="100">100↑</button>
+                    <button data-threshold="1000">1K↑</button>
                 </div>
             </div>
         </div>
@@ -768,7 +768,7 @@
 
         <!-- 거래소 지갑 관리 섹션 -->
         <div class="wallet-manager">
-            <div class="wallet-manager-header" onclick="toggleWalletManager()">
+            <div class="wallet-manager-header">
                 <h3>거래소 지갑 관리</h3>
                 <span class="toggle-icon" id="walletToggleIcon">▼</span>
             </div>
@@ -776,15 +776,15 @@
                 <div class="wallet-form">
                     <input type="text" id="walletName" placeholder="거래소명 (예: Binance_Hot, OKX_MyWallet)">
                     <input type="text" id="walletAddress" placeholder="EVM 지갑 주소 (0x...)">
-                    <button id="walletActionBtn" onclick="addWallet()">추가</button>
-                    <button id="walletCancelBtn" onclick="cancelEdit()" style="display: none; background: #666;">취소</button>
+                    <button id="walletActionBtn">추가</button>
+                    <button id="walletCancelBtn" style="display: none; background: #666;">취소</button>
                 </div>
                 
                 <div class="wallet-list" id="walletList"></div>
                 
                 <!-- CSV 일괄 업로드 섹션 -->
                 <div style="margin: 15px 0 0 0;">
-                    <div onclick="toggleCSVUpload()" style="cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 8px; background: #2e3545; border-radius: 5px; font-size: 13px;">
+                    <div style="cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 8px; background: #2e3545; border-radius: 5px; font-size: 13px;" id="csvToggleBtn">
                         <span id="csvToggleIcon" style="transition: transform 0.3s;">📁</span>
                         <span style="color: #aaa;">CSV 일괄 업로드</span>
                     </div>
@@ -795,8 +795,8 @@
                             </p>
                             <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px;">
                                 <input type="file" id="csvFile" accept=".csv" style="background: #2e3545; padding: 6px; border-radius: 4px; border: 1px solid #444; color: white; font-size: 12px;">
-                                <button onclick="uploadCSV()" style="background: #4CAF50; padding: 6px 12px; font-size: 12px;">업로드</button>
-                                <button onclick="downloadTemplate()" style="background: #2196F3; padding: 6px 12px; font-size: 12px;">템플릿</button>
+                                <button id="uploadBtn" style="background: #4CAF50; padding: 6px 12px; font-size: 12px;">업로드</button>
+                                <button id="templateBtn" style="background: #2196F3; padding: 6px 12px; font-size: 12px;">템플릿</button>
                             </div>
                             <div id="uploadStatus" style="font-size: 11px;"></div>
                         </div>
@@ -817,11 +817,12 @@
     <script>
         // 전역 상태 관리
         let wallets = {};
-        let web3 = null;
+        let web3Instance = null;
         let chart = null;
         let isSearching = false;
         let currentChain = 'ETH';
         let database = null;
+        let editingWallet = null;
 
         // Firebase 설정
         const firebaseConfig = {
@@ -931,6 +932,8 @@
 
         function updateProgressStep(stepId, status, message = '') {
             const step = document.getElementById(stepId);
+            if (!step) return;
+            
             const statusIcon = step.querySelector('span:last-child');
             
             step.className = `progress-step ${status}`;
@@ -977,7 +980,10 @@
             document.querySelectorAll('.threshold-presets button').forEach(btn => {
                 btn.classList.remove('active');
             });
-            document.querySelector(`[data-threshold="${value}"]`).classList.add('active');
+            const targetBtn = document.querySelector(`[data-threshold="${value}"]`);
+            if (targetBtn) {
+                targetBtn.classList.add('active');
+            }
         }
 
         // 주소 클릭 복사 함수
@@ -1008,10 +1014,6 @@
                     }, 1500);
                 }
             });
-        }
-
-        function formatAddress(address) {
-            return address;
         }
 
         // Firebase 초기화
@@ -1082,22 +1084,22 @@
             }
         }
 
-        function normalizeChain(chainName) {
-            const mapping = {
-                'eth': 'ETH',
-                'ethereum': 'ETH', 
-                'bsc': 'BSC',
-                'binance smart chain': 'BSC',
-                'polygon': 'Polygon',
-                'matic': 'Polygon',
-                'arbitrum': 'Arbitrum',
-                'arb': 'Arbitrum',
-                'optimism': 'Optimism',
-                'op': 'Optimism',
-                'avalanche': 'Avalanche',
-                'avax': 'Avalanche'
-            };
-            return mapping[chainName.toLowerCase()] || chainName;
+        function ensureChainWallets() {
+            if (!wallets.EVM) {
+                wallets.EVM = {};
+            }
+        }
+
+        function findWalletByAddressEVM(address) {
+            const normalizedAddress = address.toLowerCase().trim();
+            if (wallets.EVM) {
+                for (const [name, walletAddress] of Object.entries(wallets.EVM)) {
+                    if (walletAddress.toLowerCase().trim() === normalizedAddress) {
+                        return { name };
+                    }
+                }
+            }
+            return null;
         }
 
         // CSV 템플릿 다운로드
@@ -1253,24 +1255,6 @@ Example_Exchange4,0x0000000000000000000000000000000000000004`;
             }
         }
 
-        function ensureChainWallets() {
-            if (!wallets.EVM) {
-                wallets.EVM = {};
-            }
-        }
-
-        function findWalletByAddressEVM(address) {
-            const normalizedAddress = address.toLowerCase().trim();
-            if (wallets.EVM) {
-                for (const [name, walletAddress] of Object.entries(wallets.EVM)) {
-                    if (walletAddress.toLowerCase().trim() === normalizedAddress) {
-                        return { name };
-                    }
-                }
-            }
-            return null;
-        }
-
         // 블록체인 연결
         async function connectToChain(chain) {
             try {
@@ -1281,10 +1265,10 @@ Example_Exchange4,0x0000000000000000000000000000000000000004`;
                     throw new Error('지원하지 않는 체인입니다: ' + chain);
                 }
                 
-                web3 = new Web3(chainConfig.rpc);
+                web3Instance = new Web3(chainConfig.rpc);
                 currentChain = chain;
                 
-                await web3.eth.getBlockNumber();
+                await web3Instance.eth.getBlockNumber();
                 
                 updateProgressStep('step1', 'completed', '1. 블록체인 연결 완료');
                 console.log(chain + ' 체인 연결 완료');
@@ -1307,7 +1291,7 @@ Example_Exchange4,0x0000000000000000000000000000000000000004`;
                 }
 
                 console.log('토큰 컨트랙트 조회: ' + tokenAddress);
-                const contract = new web3.eth.Contract(ERC20_ABI, tokenAddress);
+                const contract = new web3Instance.eth.Contract(ERC20_ABI, tokenAddress);
                 
                 let name = 'Unknown';
                 let symbol = 'UNKNOWN';
@@ -1424,17 +1408,17 @@ Example_Exchange4,0x0000000000000000000000000000000000000004`;
             try {
                 let correctedAddress;
                 try {
-                    correctedAddress = web3.utils.toChecksumAddress(walletAddress);
+                    correctedAddress = web3Instance.utils.toChecksumAddress(walletAddress);
                 } catch (e) {
                     console.warn('주소 체크섬 변환 실패:', walletAddress, e.message);
                     return 0;
                 }
 
                 if (tokenAddress === '0x0000000000000000000000000000000000000000') {
-                    const balance = await web3.eth.getBalance(correctedAddress);
-                    return parseFloat(web3.utils.fromWei(balance, 'ether'));
+                    const balance = await web3Instance.eth.getBalance(correctedAddress);
+                    return parseFloat(web3Instance.utils.fromWei(balance, 'ether'));
                 } else {
-                    const contract = new web3.eth.Contract(ERC20_ABI, tokenAddress);
+                    const contract = new web3Instance.eth.Contract(ERC20_ABI, tokenAddress);
                     const balance = await contract.methods.balanceOf(correctedAddress).call();
                     
                     if (balance && balance !== '0') {
@@ -1480,7 +1464,7 @@ Example_Exchange4,0x0000000000000000000000000000000000000004`;
                 const batchResults = await Promise.all(batchPromises);
                 
                 batchResults.forEach(({ name, balance }) => {
-                    results[name] = balance; // 0 이상 모든 잔고 저장 (필터링은 displayBalances에서)
+                    results[name] = balance;
                 });
 
                 if (i + batchSize < walletEntries.length) {
@@ -1528,8 +1512,8 @@ Example_Exchange4,0x0000000000000000000000000000000000000004`;
             
             if (filteredEntries.length === 0) {
                 showMessage('warning', 
-                    `${minThreshold}개 이상 보유한 거래소가 없습니다. ` +
-                    `(총 ${allEntries.length}개 거래소에서 토큰 발견)`
+                    minThreshold + '개 이상 보유한 거래소가 없습니다. ' +
+                    '(총 ' + allEntries.length + '개 거래소에서 토큰 발견)'
                 );
                 
                 // 빈 결과 표시
@@ -1555,20 +1539,20 @@ Example_Exchange4,0x0000000000000000000000000000000000000004`;
             
             // UI 업데이트
             document.getElementById('totalBalance').innerHTML = 
-                `${formatNumber(totalFilteredBalance)} <small style="color: #aaa;">(전체: ${formatNumber(totalAllBalance)})</small>`;
+                formatNumber(totalFilteredBalance) + ' <small style="color: #aaa;">(전체: ' + formatNumber(totalAllBalance) + ')</small>';
             
             document.getElementById('totalValue').innerHTML = 
-                `$${formatNumber(totalFilteredValue)} <small style="color: #aaa;">(전체: $${formatNumber(totalAllValue)})</small>`;
+                '$' + formatNumber(totalFilteredValue) + ' <small style="color: #aaa;">(전체: $' + formatNumber(totalAllValue) + ')</small>';
             
             document.getElementById('exchangeCount').innerHTML = 
-                `${filteredEntries.length} <small style="color: #aaa;">/ ${allEntries.length}</small>`;
+                filteredEntries.length + ' <small style="color: #aaa;">/ ' + allEntries.length + '</small>';
             
             // 테이블 요약 정보 업데이트
             document.getElementById('filteredCount').textContent = filteredEntries.length;
             document.getElementById('currentThreshold').textContent = minThreshold;
             document.getElementById('totalWalletCount').textContent = allEntries.length;
             document.getElementById('avgBalance').textContent = formatNumber(avgBalance);
-            document.getElementById('totalAllValue').textContent = ' + formatNumber(totalAllValue);
+            document.getElementById('totalAllValue').textContent = '$' + formatNumber(totalAllValue);
             document.getElementById('tableSummary').style.display = 'flex';
             
             // 모든 필터링된 결과를 테이블에 표시
@@ -1576,7 +1560,7 @@ Example_Exchange4,0x0000000000000000000000000000000000000004`;
             updateChart(sortedFilteredEntries, totalFilteredBalance);
             
             showMessage('success', 
-                `총 ${allEntries.length}개 거래소 중 ${filteredEntries.length}개가 ${minThreshold}개 이상 보유중입니다!`
+                '총 ' + allEntries.length + '개 거래소 중 ' + filteredEntries.length + '개가 ' + minThreshold + '개 이상 보유중입니다!'
             );
         }
 
@@ -1667,26 +1651,25 @@ Example_Exchange4,0x0000000000000000000000000000000000000004`;
                 const address = wallets.EVM[name] || '주소 없음';
                 const debankUrl = address !== '주소 없음' ? 'https://debank.com/profile/' + address : '#';
                 const row = tbody.insertRow();
-                row.innerHTML = `
-                    <td>${index + 1}</td>
-                    <td>${name}</td>
-                    <td class="address-cell">
-                        ${address !== '주소 없음' ? 
-                            `<div class="address-clickable" onclick="copyToClipboard('${address}', this)">
-                                ${address}
-                                <div class="copy-tooltip">복사됨!</div>
-                            </div>` : 
+                row.innerHTML = 
+                    '<td>' + (index + 1) + '</td>' +
+                    '<td>' + name + '</td>' +
+                    '<td class="address-cell">' +
+                        (address !== '주소 없음' ? 
+                            '<div class="address-clickable" onclick="copyToClipboard(\'' + address + '\', this)">' +
+                                address +
+                                '<div class="copy-tooltip">복사됨!</div>' +
+                            '</div>' : 
                             '<span style="color: #666;">주소 없음</span>'
-                        }
-                    </td>
-                    <td><strong>${formatNumber(balance)}</strong></td>
-                    <td>
-                        ${address !== '주소 없음' ? 
+                        ) +
+                    '</td>' +
+                    '<td><strong>' + formatNumber(balance) + '</strong></td>' +
+                    '<td>' +
+                        (address !== '주소 없음' ? 
                             '<a href="' + debankUrl + '" target="_blank" class="debank-btn">보기</a>' : 
                             '<span style="color: #666; font-size: 11px;">-</span>'
-                        }
-                    </td>
-                `;
+                        ) +
+                    '</td>';
             });
         }
 
@@ -1807,8 +1790,6 @@ Example_Exchange4,0x0000000000000000000000000000000000000004`;
         }
 
         // EVM 지갑 관리 함수들
-        let editingWallet = null;
-
         function displayWallets() {
             const walletList = document.getElementById('walletList');
             walletList.innerHTML = '';
@@ -1825,13 +1806,12 @@ Example_Exchange4,0x0000000000000000000000000000000000000004`;
             Object.entries(evmWallets).forEach(([name, address]) => {
                 const item = document.createElement('div');
                 item.className = 'wallet-item';
-                item.innerHTML = `
-                    <span><span class="chain-badge" style="background: #627EEA;">EVM</span> ${name}: ${address.slice(0, 6)}...${address.slice(-4)}</span>
-                    <div class="wallet-actions">
-                        <button class="edit-btn" onclick="editWallet('${name}')">편집</button>
-                        <button class="delete-btn" onclick="deleteWallet('${name}')">삭제</button>
-                    </div>
-                `;
+                item.innerHTML = 
+                    '<span><span class="chain-badge" style="background: #627EEA;">EVM</span> ' + name + ': ' + address.slice(0, 6) + '...' + address.slice(-4) + '</span>' +
+                    '<div class="wallet-actions">' +
+                        '<button class="edit-btn" onclick="editWallet(\'' + name + '\')">편집</button>' +
+                        '<button class="delete-btn" onclick="deleteWallet(\'' + name + '\')">삭제</button>' +
+                    '</div>';
                 walletList.appendChild(item);
             });
         }
@@ -1926,10 +1906,6 @@ Example_Exchange4,0x0000000000000000000000000000000000000004`;
             
             displayWallets();
             cancelEdit();
-        }
-
-        function findWalletByAddress(address) {
-            return findWalletByAddressEVM(address);
         }
 
         async function addWallet() {
@@ -2030,32 +2006,62 @@ Example_Exchange4,0x0000000000000000000000000000000000000004`;
             }
         }
 
+        // 이벤트 리스너 등록
+        function setupEventListeners() {
+            // 검색 버튼
+            document.getElementById('searchBtn').addEventListener('click', searchToken);
+            
+            // Enter 키 지원
+            document.getElementById('tokenInput').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    searchToken();
+                }
+            });
+            
+            // 임계값 프리셋 버튼들
+            document.querySelectorAll('.threshold-presets button').forEach(button => {
+                button.addEventListener('click', function() {
+                    const threshold = this.getAttribute('data-threshold');
+                    setThreshold(threshold);
+                });
+            });
+            
+            // 임계값 입력 변경 시 프리셋 버튼 업데이트
+            document.getElementById('minBalanceInput').addEventListener('input', function() {
+                const value = this.value;
+                document.querySelectorAll('.threshold-presets button').forEach(btn => {
+                    btn.classList.remove('active');
+                });
+                const matchingBtn = document.querySelector('[data-threshold="' + value + '"]');
+                if (matchingBtn) {
+                    matchingBtn.classList.add('active');
+                }
+            });
+            
+            // 지갑 관리 버튼들
+            document.getElementById('walletActionBtn').addEventListener('click', addWallet);
+            document.getElementById('walletCancelBtn').addEventListener('click', cancelEdit);
+            
+            // 지갑 관리 토글
+            document.querySelector('.wallet-manager-header').addEventListener('click', toggleWalletManager);
+            
+            // CSV 업로드 관련
+            document.getElementById('csvToggleBtn').addEventListener('click', toggleCSVUpload);
+            document.getElementById('uploadBtn').addEventListener('click', uploadCSV);
+            document.getElementById('templateBtn').addEventListener('click', downloadTemplate);
+        }
+
         // 초기화
-        window.onload = async function() {
+        window.addEventListener('DOMContentLoaded', async function() {
             console.log('핫월렛 대시보드 시작...');
             
             try {
+                // 이벤트 리스너 등록
+                setupEventListeners();
+                
+                // Firebase 초기화 및 지갑 로드
                 const firebaseOk = await initializeFirebase();
                 await loadWallets();
-                
-                // Enter 키 지원
-                document.getElementById('tokenInput').addEventListener('keypress', function(e) {
-                    if (e.key === 'Enter') {
-                        searchToken();
-                    }
-                });
-                
-                // 임계값 입력 변경 시 프리셋 버튼 업데이트
-                document.getElementById('minBalanceInput').addEventListener('input', function() {
-                    const value = this.value;
-                    document.querySelectorAll('.threshold-presets button').forEach(btn => {
-                        btn.classList.remove('active');
-                    });
-                    const matchingBtn = document.querySelector(`[data-threshold="${value}"]`);
-                    if (matchingBtn) {
-                        matchingBtn.classList.add('active');
-                    }
-                });
                 
                 console.log('대시보드 초기화 완료!');
                 
@@ -2063,7 +2069,7 @@ Example_Exchange4,0x0000000000000000000000000000000000000004`;
                 console.error('초기화 오류:', error);
                 showMessage('error', '시스템 초기화에 실패했습니다.');
             }
-        };
+        });
     </script>
 </body>
 </html>
