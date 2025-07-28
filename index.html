@@ -314,6 +314,21 @@
             margin-right: 10px;
         }
 
+        .wallet-actions {
+            display: flex;
+            gap: 5px;
+        }
+
+        .edit-btn {
+            background: #2196F3;
+            padding: 5px 10px;
+            font-size: 12px;
+        }
+
+        .edit-btn:hover {
+            background: #1976D2;
+        }
+
         .delete-btn {
             background: #d32f2f;
             padding: 5px 10px;
@@ -592,7 +607,8 @@
                 <div class="wallet-form">
                     <input type="text" id="walletName" placeholder="거래소명 (예: Binance_Hot, OKX_MyWallet)">
                     <input type="text" id="walletAddress" placeholder="EVM 지갑 주소 (0x...)">
-                    <button onclick="addWallet()">추가</button>
+                    <button id="walletActionBtn" onclick="addWallet()">추가</button>
+                    <button id="walletCancelBtn" onclick="cancelEdit()" style="display: none; background: #666;">취소</button>
                 </div>
                 
                 <div class="wallet-list" id="walletList"></div>
@@ -1565,6 +1581,8 @@ Gate.io_Hot,0x0D0707963952f2fBA59dD06f2b425ace40b492Fe`;
         }
 
         // 💼 EVM 지갑 관리 함수들
+        let editingWallet = null; // 편집 중인 지갑 추적
+
         function displayWallets() {
             const walletList = document.getElementById('walletList');
             walletList.innerHTML = '';
@@ -1583,10 +1601,114 @@ Gate.io_Hot,0x0D0707963952f2fBA59dD06f2b425ace40b492Fe`;
                 item.className = 'wallet-item';
                 item.innerHTML = `
                     <span><span class="chain-badge" style="background: #627EEA;">EVM</span> ${name}: ${address}</span>
-                    <button class="delete-btn" onclick="deleteWallet('${name}')">삭제</button>
+                    <div class="wallet-actions">
+                        <button class="edit-btn" onclick="editWallet('${name}')">편집</button>
+                        <button class="delete-btn" onclick="deleteWallet('${name}')">삭제</button>
+                    </div>
                 `;
                 walletList.appendChild(item);
             });
+        }
+
+        function editWallet(name) {
+            editingWallet = name;
+            
+            // 기존 데이터를 입력폼에 로드
+            document.getElementById('walletName').value = name;
+            document.getElementById('walletAddress').value = wallets.EVM[name];
+            
+            // 버튼 텍스트 및 기능 변경
+            const actionBtn = document.getElementById('walletActionBtn');
+            const cancelBtn = document.getElementById('walletCancelBtn');
+            
+            actionBtn.textContent = '수정 완료';
+            actionBtn.onclick = updateWallet;
+            actionBtn.style.background = '#2196F3';
+            
+            cancelBtn.style.display = 'inline-block';
+            
+            // 입력창 포커스
+            document.getElementById('walletName').focus();
+            
+            showMessage('success', name + ' 지갑을 편집 중입니다. 수정 후 "수정 완료"를 클릭하세요.');
+        }
+
+        function cancelEdit() {
+            editingWallet = null;
+            
+            // 입력폼 초기화
+            document.getElementById('walletName').value = '';
+            document.getElementById('walletAddress').value = '';
+            
+            // 버튼 원상복구
+            const actionBtn = document.getElementById('walletActionBtn');
+            const cancelBtn = document.getElementById('walletCancelBtn');
+            
+            actionBtn.textContent = '추가';
+            actionBtn.onclick = addWallet;
+            actionBtn.style.background = '#3b4252';
+            
+            cancelBtn.style.display = 'none';
+            
+            showMessage('success', '편집이 취소되었습니다.');
+        }
+
+        async function updateWallet() {
+            const newName = document.getElementById('walletName').value.trim();
+            let newAddress = document.getElementById('walletAddress').value.trim();
+            
+            if (!newName || !newAddress) {
+                showMessage('error', '거래소명과 주소를 모두 입력하세요.');
+                return;
+            }
+            
+            if (!newAddress.startsWith('0x')) {
+                newAddress = '0x' + newAddress;
+            }
+            
+            if (newAddress.length !== 42) {
+                showMessage('error', '올바른 주소 형식이 아닙니다. (42자리 필요)');
+                return;
+            }
+            
+            try {
+                const web3Temp = new Web3();
+                newAddress = web3Temp.utils.toChecksumAddress(newAddress);
+            } catch (e) {
+                showMessage('error', '유효하지 않은 이더리움 주소입니다.');
+                return;
+            }
+            
+            // 주소 중복 확인 (편집 중인 지갑 제외)
+            const existingWallet = findWalletByAddressEVM(newAddress);
+            if (existingWallet && existingWallet.name !== editingWallet) {
+                showMessage('error', '이미 등록된 주소입니다! (EVM - ' + existingWallet.name + ')');
+                return;
+            }
+            
+            // 이름 중복 확인 (편집 중인 지갑 제외)
+            if (wallets.EVM[newName] && newName !== editingWallet) {
+                showMessage('error', 'EVM에 이미 ' + newName + ' 이름이 존재합니다.');
+                return;
+            }
+            
+            // 기존 지갑 삭제 (이름이 변경된 경우)
+            if (newName !== editingWallet) {
+                delete wallets.EVM[editingWallet];
+            }
+            
+            // 새 지갑 정보 저장
+            wallets.EVM[newName] = newAddress;
+            
+            const saved = await saveWallets();
+            if (saved) {
+                showMessage('success', 'EVM - ' + newName + ' 지갑이 수정되었습니다!');
+            } else {
+                showMessage('warning', '지갑은 수정되었지만 클라우드 동기화에 실패했습니다.');
+            }
+            
+            displayWallets();
+            cancelEdit(); // 편집 모드 종료
         }
 
         function findWalletByAddress(address) {
@@ -1661,6 +1783,11 @@ Gate.io_Hot,0x0D0707963952f2fBA59dD06f2b425ace40b492Fe`;
                 }
                 
                 displayWallets();
+                
+                // 편집 중인 지갑이 삭제된 경우 편집 모드 취소
+                if (editingWallet === name) {
+                    cancelEdit();
+                }
             }
         }
 
