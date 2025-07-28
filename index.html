@@ -1584,7 +1584,7 @@
                                 price: priceData[geckoId].usd || 0,
                                 marketCap: priceData[geckoId].usd_market_cap || 0,
                                 change24h: priceData[geckoId].usd_24h_change || 0,
-                                fdv: detailData.market_data?.fully_diluted_valuation?.usd || priceData[geckoId].usd_market_cap || 0
+                                fdv: (detailData.market_data && detailData.market_data.fully_diluted_valuation && detailData.market_data.fully_diluted_valuation.usd) || priceData[geckoId].usd_market_cap || 0
                             };
                         }
                     }
