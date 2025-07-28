@@ -590,16 +590,8 @@
             </div>
             <div class="wallet-manager-content" id="walletManagerContent">
                 <div class="wallet-form">
-                    <select id="walletChain">
-                        <option value="ETH">Ethereum</option>
-                        <option value="BSC">BSC</option>
-                        <option value="Polygon">Polygon</option>
-                        <option value="Arbitrum">Arbitrum</option>
-                        <option value="Optimism">Optimism</option>
-                        <option value="Avalanche">Avalanche</option>
-                    </select>
-                    <input type="text" id="walletName" placeholder="거래소명 (예: Binance_Arbitrum)">
-                    <input type="text" id="walletAddress" placeholder="지갑 주소 (0x...)">
+                    <input type="text" id="walletName" placeholder="거래소명 (예: Binance_Hot, OKX_MyWallet)">
+                    <input type="text" id="walletAddress" placeholder="EVM 지갑 주소 (0x...)">
                     <button onclick="addWallet()">추가</button>
                 </div>
                 
@@ -614,7 +606,7 @@
                     <div id="csvUploadContent" style="max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out;">
                         <div style="margin-top: 10px; padding: 12px; background: #1a1f2e; border-radius: 8px; border: 1px solid #444;">
                             <p style="font-size: 11px; color: #aaa; margin-bottom: 8px;">
-                                형식: chain,name,address (eth, bsc, polygon 등 소문자도 OK!)
+                                형식: name,address (EVM 주소 통합 관리)
                             </p>
                             <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px;">
                                 <input type="file" id="csvFile" accept=".csv" style="background: #2e3545; padding: 6px; border-radius: 4px; border: 1px solid #444; color: white; font-size: 12px;">
@@ -703,9 +695,9 @@
             }
         };
 
-        // 📋 확장된 기본 거래소 지갑들 (체크섬 주소로 수정)
+        // 📋 EVM 통합 기본 거래소 지갑들
         const defaultWallets = {
-            "ETH": {
+            "EVM": {
                 "Binance_Hot1": "0x28C6c06298d514Db089934071355E5743bf21d60",
                 "Binance_Hot2": "0x21a31Ee1afC51d94C2eFcCAa2092aD1028285549",
                 "Binance_Hot3": "0xDFd5293D8e347dFe59E90eFd55b2956a1343963d",
@@ -720,28 +712,18 @@
                 "MEXC_Hot": "0x75e89d5979e4f6fba9f97c104c2f0afb3f1dcb88",
                 "Bitget_Hot": "0x5bdf85216ec1e38d6458c870992a69e38e03f7ef",
                 "Crypto.com_Hot": "0x6262998Ced04146fA42253a5C0AF90CA02dfd2A3",
-                "Huobi_Hot": "0xE93381fB4c4F14bDa253907b18faD305D799241a"
-            },
-            "BSC": {
+                "Huobi_Hot": "0xE93381fB4c4F14bDa253907b18faD305D799241a",
                 "Binance_BSC": "0x8894E0a0c962CB723c1976a4421c95949bE2D4E3",
                 "Gate.io_BSC": "0x1C4b70a3968436B9A0a9cf5205c787eb81Bb558c",
                 "KuCoin_BSC": "0xEB2d2F1b8c558a40207669291Fda468E50c8A0bB",
-                "MEXC_BSC": "0x4982085C9e2F89F2eCb8131Eca71aFAD896e89CB"
-            },
-            "Polygon": {
+                "MEXC_BSC": "0x4982085C9e2F89F2eCb8131Eca71aFAD896e89CB",
                 "Binance_Polygon": "0xe7804c37c13166fF0b37F5aE0BB07A3aEbb6e245",
-                "OKX_Polygon": "0xAA58D356B49C909Ce69c64318E7f8f97E3E9D616"
-            },
-            "Arbitrum": {
+                "OKX_Polygon": "0xAA58D356B49C909Ce69c64318E7f8f97E3E9D616",
                 "Binance_Arbitrum": "0xB38e8c17e38363aF6EbdCb3dAE12e0243582891D",
                 "OKX_Arbitrum": "0x7F268357A8c2552623316e2562D90e642bB538E5",
-                "Gate.io_Arbitrum": "0xc882b111a75c0c657fc507c04fbfcd2cc984f071"
-            },
-            "Optimism": {
+                "Gate.io_Arbitrum": "0xc882b111a75c0c657fc507c04fbfcd2cc984f071",
                 "Binance_Optimism": "0xeB2629a2734e272Bcc07BDA959863f316F4bD4Cf",
-                "OKX_Optimism": "0x5C69C2c9fb09230b5195474a7d1a3Bbd3C6AAa4c"
-            },
-            "Avalanche": {
+                "OKX_Optimism": "0x5C69C2c9fb09230b5195474a7d1a3Bbd3C6AAa4c",
                 "Binance_Avalanche": "0x28C6c06298d514Db089934071355E5743bf21d60",
                 "OKX_Avalanche": "0x06959153B974D0D5fDfd87D561db6d8d4FA0910b"
             }
@@ -919,28 +901,28 @@
             return mapping[chainName.toLowerCase()] || chainName;
         }
 
-        // 📁 CSV 템플릿 다운로드
+        // 📁 CSV 템플릿 다운로드 (EVM 통합)
         function downloadTemplate() {
-            const csvContent = `chain,name,address
-eth,Binance_Hot1,0x28C6c06298d514Db089934071355E5743bf21d60
-bsc,OKX_BSC,0x8894E0a0c962CB723c1976a4421c95949bE2D4E3
-polygon,MyPolygon_Wallet,0xe7804c37c13166fF0b37F5aE0BB07A3aEbb6e245
-arbitrum,Gate_Arbitrum,0xB38e8c17e38363aF6EbdCb3dAE12e0243582891D`;
+            const csvContent = `name,address
+Binance_Hot1,0x28C6c06298d514Db089934071355E5743bf21d60
+OKX_Hot,0x98EC059Dc3aDFBdd63429454aEB0c990FBA4A128
+KuCoin_Hot,0xd6216fc19db775df9774a6e33526131da7d19a2c
+Gate.io_Hot,0x0D0707963952f2fBA59dD06f2b425ace40b492Fe`;
             
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement('a');
             const url = URL.createObjectURL(blob);
             link.setAttribute('href', url);
-            link.setAttribute('download', 'wallet_template.csv');
+            link.setAttribute('download', 'evm_wallets_template.csv');
             link.style.visibility = 'hidden';
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
             
-            showMessage('success', '템플릿 파일이 다운로드되었습니다!');
+            showMessage('success', 'EVM 지갑 템플릿이 다운로드되었습니다!');
         }
 
-        // 📁 CSV 업로드 및 처리
+        // 📁 CSV 업로드 및 처리 (EVM 통합)
         async function uploadCSV() {
             const fileInput = document.getElementById('csvFile');
             const file = fileInput.files[0];
@@ -967,10 +949,10 @@ arbitrum,Gate_Arbitrum,0xB38e8c17e38363aF6EbdCb3dAE12e0243582891D`;
                 
                 // 헤더 확인
                 const headers = lines[0].toLowerCase().split(',').map(h => h.trim());
-                const expectedHeaders = ['chain', 'name', 'address'];
+                const expectedHeaders = ['name', 'address'];
                 
                 if (!expectedHeaders.every(header => headers.includes(header))) {
-                    throw new Error('CSV 헤더가 올바르지 않습니다. chain,name,address 형식이어야 합니다.');
+                    throw new Error('CSV 헤더가 올바르지 않습니다. name,address 형식이어야 합니다.');
                 }
                 
                 // 데이터 처리
@@ -982,26 +964,15 @@ arbitrum,Gate_Arbitrum,0xB38e8c17e38363aF6EbdCb3dAE12e0243582891D`;
                     try {
                         const values = lines[i].split(',').map(v => v.trim());
                         
-                        if (values.length < 3) continue;
+                        if (values.length < 2) continue;
                         
-                        const chainIndex = headers.indexOf('chain');
                         const nameIndex = headers.indexOf('name');
                         const addressIndex = headers.indexOf('address');
                         
-                        let chain = values[chainIndex];
                         const name = values[nameIndex];
                         let address = values[addressIndex];
                         
-                        // 체인명 자동 변환
-                        chain = normalizeChain(chain);
-                        
                         // 유효성 검사
-                        if (!CHAIN_CONFIG[chain]) {
-                            errors.push('줄 ' + (i+1) + ': 지원하지 않는 체인 "' + values[chainIndex] + '"');
-                            errorCount++;
-                            continue;
-                        }
-                        
                         if (!name) {
                             errors.push('줄 ' + (i+1) + ': 거래소명이 비어있습니다.');
                             errorCount++;
@@ -1024,26 +995,26 @@ arbitrum,Gate_Arbitrum,0xB38e8c17e38363aF6EbdCb3dAE12e0243582891D`;
                             continue;
                         }
                         
-                        // 중복 확인
-                        const existingWallet = findWalletByAddress(address);
+                        // EVM 지갑에서 중복 확인
+                        const existingWallet = findWalletByAddressEVM(address);
                         if (existingWallet) {
-                            errors.push('줄 ' + (i+1) + ': 이미 등록된 주소 (' + existingWallet.chain + ' - ' + existingWallet.name + ')');
+                            errors.push('줄 ' + (i+1) + ': 이미 등록된 주소 (EVM - ' + existingWallet.name + ')');
                             errorCount++;
                             continue;
                         }
                         
                         // 지갑 추가
-                        if (!wallets[chain]) {
-                            wallets[chain] = {};
+                        if (!wallets.EVM) {
+                            wallets.EVM = {};
                         }
                         
-                        if (wallets[chain][name]) {
-                            errors.push('줄 ' + (i+1) + ': ' + chain + ' 체인에 이미 ' + name + ' 이름이 존재합니다.');
+                        if (wallets.EVM[name]) {
+                            errors.push('줄 ' + (i+1) + ': EVM에 이미 ' + name + ' 이름이 존재합니다.');
                             errorCount++;
                             continue;
                         }
                         
-                        wallets[chain][name] = address;
+                        wallets.EVM[name] = address;
                         addedCount++;
                         
                     } catch (error) {
@@ -1057,7 +1028,7 @@ arbitrum,Gate_Arbitrum,0xB38e8c17e38363aF6EbdCb3dAE12e0243582891D`;
                     const saved = await saveWallets();
                     displayWallets();
                     
-                    let statusMessage = '✅ ' + addedCount + '개 지갑이 추가되었습니다!';
+                    let statusMessage = '✅ ' + addedCount + '개 EVM 지갑이 추가되었습니다!';
                     if (errorCount > 0) {
                         statusMessage += ' (' + errorCount + '개 오류)';
                     }
@@ -1092,13 +1063,24 @@ arbitrum,Gate_Arbitrum,0xB38e8c17e38363aF6EbdCb3dAE12e0243582891D`;
             }
         }
 
-        // 🔧 체인별 지갑 객체 보장
+        // 🔧 EVM 지갑 객체 보장
         function ensureChainWallets() {
-            Object.keys(CHAIN_CONFIG).forEach(chain => {
-                if (!wallets[chain]) {
-                    wallets[chain] = {};
+            if (!wallets.EVM) {
+                wallets.EVM = {};
+            }
+        }
+
+        // EVM 지갑에서 주소로 찾기
+        function findWalletByAddressEVM(address) {
+            const normalizedAddress = address.toLowerCase().trim();
+            if (wallets.EVM) {
+                for (const [name, walletAddress] of Object.entries(wallets.EVM)) {
+                    if (walletAddress.toLowerCase().trim() === normalizedAddress) {
+                        return { name };
+                    }
                 }
-            });
+            }
+            return null;
         }
 
         // 🌐 블록체인 연결
@@ -1449,7 +1431,7 @@ arbitrum,Gate_Arbitrum,0xB38e8c17e38363aF6EbdCb3dAE12e0243582891D`;
             tbody.innerHTML = '';
             
             balances.forEach(([name, balance], index) => {
-                const address = wallets[currentChain][name] || '주소 없음';
+                const address = wallets.EVM[name] || '주소 없음';
                 const debankUrl = address !== '주소 없음' ? 'https://debank.com/profile/' + address : '#';
                 const row = tbody.insertRow();
                 row.innerHTML = `
@@ -1537,10 +1519,10 @@ arbitrum,Gate_Arbitrum,0xB38e8c17e38363aF6EbdCb3dAE12e0243582891D`;
                 displayTokenInfo(tokenInfo, tokenAddress);
                 displayPriceInfo(priceInfo);
                 
-                const chainWallets = wallets[chain] || {};
+                const chainWallets = wallets.EVM || {};
                 
                 if (Object.keys(chainWallets).length === 0) {
-                    throw new Error(chain + ' 체인에 등록된 지갑이 없습니다.');
+                    throw new Error('등록된 EVM 지갑이 없습니다.');
                 }
                 
                 document.getElementById('progressSection').style.display = 'block';
@@ -1582,49 +1564,36 @@ arbitrum,Gate_Arbitrum,0xB38e8c17e38363aF6EbdCb3dAE12e0243582891D`;
             }
         }
 
-        // 💼 지갑 관리 함수들
+        // 💼 EVM 지갑 관리 함수들
         function displayWallets() {
             const walletList = document.getElementById('walletList');
             walletList.innerHTML = '';
             
-            let totalCount = 0;
-            Object.values(wallets).forEach(chainWallets => {
-                totalCount += Object.keys(chainWallets).length;
-            });
+            const evmWallets = wallets.EVM || {};
+            const totalCount = Object.keys(evmWallets).length;
             
             const countDiv = document.createElement('div');
             countDiv.style.marginBottom = '10px';
             countDiv.style.color = '#aaa';
-            countDiv.textContent = '총 ' + totalCount + '개의 지갑이 등록되어 있습니다.';
+            countDiv.textContent = '총 ' + totalCount + '개의 EVM 지갑이 등록되어 있습니다.';
             walletList.appendChild(countDiv);
             
-            Object.entries(wallets).forEach(([chain, chainWallets]) => {
-                Object.entries(chainWallets).forEach(([name, address]) => {
-                    const item = document.createElement('div');
-                    item.className = 'wallet-item';
-                    item.innerHTML = `
-                        <span><span class="chain-badge ${chain.toLowerCase()}">${chain}</span> ${name}: ${address}</span>
-                        <button class="delete-btn" onclick="deleteWallet('${chain}', '${name}')">삭제</button>
-                    `;
-                    walletList.appendChild(item);
-                });
+            Object.entries(evmWallets).forEach(([name, address]) => {
+                const item = document.createElement('div');
+                item.className = 'wallet-item';
+                item.innerHTML = `
+                    <span><span class="chain-badge" style="background: #627EEA;">EVM</span> ${name}: ${address}</span>
+                    <button class="delete-btn" onclick="deleteWallet('${name}')">삭제</button>
+                `;
+                walletList.appendChild(item);
             });
         }
 
         function findWalletByAddress(address) {
-            const normalizedAddress = address.toLowerCase().trim();
-            for (const [chain, chainWallets] of Object.entries(wallets)) {
-                for (const [name, walletAddress] of Object.entries(chainWallets)) {
-                    if (walletAddress.toLowerCase().trim() === normalizedAddress) {
-                        return { chain, name };
-                    }
-                }
-            }
-            return null;
+            return findWalletByAddressEVM(address);
         }
 
         async function addWallet() {
-            const chain = document.getElementById('walletChain').value;
             const name = document.getElementById('walletName').value.trim();
             let address = document.getElementById('walletAddress').value.trim();
             
@@ -1650,26 +1619,26 @@ arbitrum,Gate_Arbitrum,0xB38e8c17e38363aF6EbdCb3dAE12e0243582891D`;
                 return;
             }
             
-            if (!wallets[chain]) {
-                wallets[chain] = {};
+            if (!wallets.EVM) {
+                wallets.EVM = {};
             }
             
-            const existingWallet = findWalletByAddress(address);
+            const existingWallet = findWalletByAddressEVM(address);
             if (existingWallet) {
-                showMessage('error', '이미 등록된 주소입니다! (' + existingWallet.chain + ' - ' + existingWallet.name + ')');
+                showMessage('error', '이미 등록된 주소입니다! (EVM - ' + existingWallet.name + ')');
                 return;
             }
             
-            if (wallets[chain][name]) {
-                showMessage('error', chain + ' 체인에 이미 ' + name + ' 이름이 존재합니다.');
+            if (wallets.EVM[name]) {
+                showMessage('error', 'EVM에 이미 ' + name + ' 이름이 존재합니다.');
                 return;
             }
             
-            wallets[chain][name] = address;
+            wallets.EVM[name] = address;
             
             const saved = await saveWallets();
             if (saved) {
-                showMessage('success', chain + ' - ' + name + ' 지갑이 추가되었습니다!');
+                showMessage('success', 'EVM - ' + name + ' 지갑이 추가되었습니다!');
             } else {
                 showMessage('warning', '지갑은 추가되었지만 클라우드 동기화에 실패했습니다.');
             }
@@ -1680,9 +1649,9 @@ arbitrum,Gate_Arbitrum,0xB38e8c17e38363aF6EbdCb3dAE12e0243582891D`;
             document.getElementById('walletAddress').value = '';
         }
 
-        async function deleteWallet(chain, name) {
-            if (confirm(chain + ' - ' + name + ' 지갑을 삭제하시겠습니까?')) {
-                delete wallets[chain][name];
+        async function deleteWallet(name) {
+            if (confirm('EVM - ' + name + ' 지갑을 삭제하시겠습니까?')) {
+                delete wallets.EVM[name];
                 
                 const saved = await saveWallets();
                 if (saved) {
