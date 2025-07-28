@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🔥 핫월렛 토큰 대시보드</title>
+    <title>핫월렛 토큰 대시보드 - 확장 버전</title>
     <script src="https://cdn.jsdelivr.net/npm/web3@1.10.0/dist/web3.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- Firebase SDK -->
@@ -58,6 +58,7 @@
             display: flex;
             gap: 10px;
             margin-top: 10px;
+            flex-wrap: wrap;
         }
 
         .native-btn {
@@ -77,6 +78,22 @@
             transform: translateY(-2px);
         }
 
+        .chain-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: bold;
+            margin-left: 5px;
+        }
+
+        .chain-badge.eth { background: #627EEA; }
+        .chain-badge.bsc { background: #F3BA2F; color: #000; }
+        .chain-badge.polygon { background: #8247E5; }
+        .chain-badge.arbitrum { background: #28A0F0; }
+        .chain-badge.optimism { background: #FF0420; }
+        .chain-badge.avalanche { background: #E84142; }
+
         select {
             background: #1a1f2e;
             color: white;
@@ -85,7 +102,7 @@
             border-radius: 8px;
             font-size: 16px;
             cursor: pointer;
-            min-width: 150px;
+            min-width: 180px;
         }
 
         input {
@@ -441,65 +458,51 @@
             animation: pulse 1s infinite;
         }
 
-        .firebase-guide {
-            background: #2e3545;
-            padding: 20px;
+        .new-chains-notice {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 15px;
             border-radius: 10px;
             margin-bottom: 20px;
-            border-left: 4px solid #ff9800;
+            text-align: center;
+            border: 2px solid #667eea;
         }
 
-        .firebase-guide h4 {
-            color: #ff9800;
-            margin-bottom: 10px;
-        }
-
-        .firebase-guide ol {
-            margin-left: 20px;
-        }
-
-        .firebase-guide li {
-            margin-bottom: 5px;
+        .new-chains-notice h4 {
+            margin-bottom: 8px;
+            color: #fff;
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>🔥 핫월렛 토큰 대시보드</h1>
-            <p>거래소 핫월렛의 토큰 잔고를 한 번에 확인하세요!</p>
+            <h1>핫월렛 토큰 대시보드</h1>
             <div id="connectionStatus" style="margin-top: 10px;">
                 <span class="status-indicator connected"></span>
                 <span id="statusText">시스템 준비 완료!</span>
             </div>
         </div>
 
-        <!-- Firebase 설정 가이드 -->
-        <div class="firebase-guide" id="firebaseGuide" style="display: none;">
-            <h4>🔥 Firebase 설정이 필요합니다!</h4>
-            <ol>
-                <li><a href="https://console.firebase.google.com/" target="_blank">Firebase Console</a>에서 프로젝트 생성</li>
-                <li>"Realtime Database" 설정 (테스트 모드)</li>
-                <li>웹 앱 추가 후 설정 정보를 코드에 입력</li>
-                <li>현재는 로컬 모드로 실행 중입니다.</li>
-            </ol>
-        </div>
-
         <!-- 검색 섹션 -->
         <div class="search-section">
             <div class="search-row">
-                <label><strong>📡 체인 선택:</strong></label>
+                <label><strong>체인 선택:</strong></label>
             </div>
             <div class="search-row">
                 <select id="chainSelect" onchange="updateNativeTokenButtons()">
-                    <option value="ETH">Ethereum</option>
-                    <option value="BSC">BSC</option>
-                    <option value="Polygon">Polygon</option>
+                    <option value="ETH">Ethereum <span class="chain-badge eth">ETH</span></option>
+                    <option value="BSC">BSC <span class="chain-badge bsc">BNB</span></option>
+                    <option value="Polygon">Polygon <span class="chain-badge polygon">MATIC</span></option>
+                    <option value="Arbitrum">Arbitrum <span class="chain-badge arbitrum">ARB</span></option>
+                    <option value="Optimism">Optimism <span class="chain-badge optimism">OP</span></option>
+                    <option value="Avalanche">Avalanche <span class="chain-badge avalanche">AVAX</span></option>
                 </select>
-                <input type="text" id="tokenInput" placeholder="토큰 컨트랙트 주소 (0x...) 또는 ETH/BNB/MATIC">
+                <input type="text" id="tokenInput" placeholder="토큰 컨트랙트 주소 (0x...) 또는 네이티브 토큰명">
                 <button id="searchBtn" onclick="searchToken()">🔍 조회</button>
             </div>
-
+            <div class="native-token-buttons" id="nativeButtons">
+                <!-- 동적으로 생성됨 -->
+            </div>
         </div>
 
         <!-- 상세 진행 상태 -->
@@ -536,8 +539,8 @@
                     <div class="info-value" id="tokenSymbol">-</div>
                 </div>
                 <div class="info-card blue">
-                    <div class="info-label">Decimals:</div>
-                    <div class="info-value" id="tokenDecimals">-</div>
+                    <div class="info-label">체인:</div>
+                    <div class="info-value" id="currentChainDisplay">-</div>
                 </div>
                 <div class="info-card blue">
                     <div class="info-label">컨트랙트:</div>
@@ -624,17 +627,20 @@
         <!-- 거래소 지갑 관리 섹션 -->
         <div class="wallet-manager">
             <div class="wallet-manager-header" onclick="toggleWalletManager()">
-                <h3>📋 거래소 지갑 관리</h3>
+                <h3>거래소 지갑 관리</h3>
                 <span class="toggle-icon" id="walletToggleIcon">▼</span>
             </div>
             <div class="wallet-manager-content" id="walletManagerContent">
                 <div class="wallet-form">
                     <select id="walletChain">
-                        <option value="ETH">ETH</option>
+                        <option value="ETH">Ethereum</option>
                         <option value="BSC">BSC</option>
                         <option value="Polygon">Polygon</option>
+                        <option value="Arbitrum">Arbitrum</option>
+                        <option value="Optimism">Optimism</option>
+                        <option value="Avalanche">Avalanche</option>
                     </select>
-                    <input type="text" id="walletName" placeholder="거래소명 (예: Binance_Hot)">
+                    <input type="text" id="walletName" placeholder="거래소명 (예: Binance_Arbitrum)">
                     <input type="text" id="walletAddress" placeholder="지갑 주소 (0x...)">
                     <button onclick="addWallet()">추가</button>
                 </div>
@@ -660,7 +666,7 @@
         let currentChain = 'ETH';
         let database = null;
 
-        // 🔥 Firebase 설정 완료!
+        // 🔥 Firebase 설정
         const firebaseConfig = {
             apiKey: "AIzaSyB8OcOZ5uNPy6fqCfLHqM7IJUb2dHfxP6g",
             authDomain: "crypto-dashboard-a5a64.firebaseapp.com",
@@ -671,7 +677,53 @@
             appId: "1:952139620608:web:a9c3291493e78660a653e5"
         };
 
-        // 📋 기본 거래소 지갑들
+        // 🌐 확장된 체인 설정
+        const CHAIN_CONFIG = {
+            'ETH': {
+                name: 'Ethereum',
+                rpc: 'https://eth.llamarpc.com',
+                nativeToken: { name: 'Ethereum', symbol: 'ETH', decimals: 18 },
+                geckoId: 'ethereum',
+                color: '#627EEA'
+            },
+            'BSC': {
+                name: 'BSC',
+                rpc: 'https://bsc-dataseed.binance.org/',
+                nativeToken: { name: 'BNB', symbol: 'BNB', decimals: 18 },
+                geckoId: 'binancecoin',
+                color: '#F3BA2F'
+            },
+            'Polygon': {
+                name: 'Polygon',
+                rpc: 'https://polygon-rpc.com',
+                nativeToken: { name: 'Polygon', symbol: 'MATIC', decimals: 18 },
+                geckoId: 'matic-network',
+                color: '#8247E5'
+            },
+            'Arbitrum': {
+                name: 'Arbitrum',
+                rpc: 'https://arb1.arbitrum.io/rpc',
+                nativeToken: { name: 'Arbitrum', symbol: 'ARB', decimals: 18 },
+                geckoId: 'arbitrum',
+                color: '#28A0F0'
+            },
+            'Optimism': {
+                name: 'Optimism',
+                rpc: 'https://mainnet.optimism.io',
+                nativeToken: { name: 'Optimism', symbol: 'OP', decimals: 18 },
+                geckoId: 'optimism',
+                color: '#FF0420'
+            },
+            'Avalanche': {
+                name: 'Avalanche',
+                rpc: 'https://api.avax.network/ext/bc/C/rpc',
+                nativeToken: { name: 'Avalanche', symbol: 'AVAX', decimals: 18 },
+                geckoId: 'avalanche-2',
+                color: '#E84142'
+            }
+        };
+
+        // 📋 확장된 기본 거래소 지갑들
         const defaultWallets = {
             "ETH": {
                 "Binance_Hot1": "0x28C6c06298d514Db089934071355E5743bf21d60",
@@ -699,6 +751,19 @@
             "Polygon": {
                 "Binance_Polygon": "0xe7804c37c13166fF0b37F5aE0BB07A3aEbb6e245",
                 "OKX_Polygon": "0xAA58D356B49C909Ce69c64318E7f8f97E3E9D616"
+            },
+            "Arbitrum": {
+                "Binance_Arbitrum": "0xB38e8c17e38363aF6EbdCb3dAE12e0243582891D",
+                "OKX_Arbitrum": "0x7F268357A8c2552623316e2562D90e642bB538E5",
+                "Gate.io_Arbitrum": "0xc882b111a75c0c657fc507c04fbfcd2cc984f071"
+            },
+            "Optimism": {
+                "Binance_Optimism": "0xeb2629a2734e272bcc07bda959863f316f4bd4cf",
+                "OKX_Optimism": "0x5C69C2c9fb09230b5195474a7d1a3Bbd3C6AAa4c"
+            },
+            "Avalanche": {
+                "Binance_Avalanche": "0x28C6c06298d514Db089934071355E5743bf21d60",
+                "OKX_Avalanche": "0x06959153B974D0D5fDfd87D561db6d8d4FA0910b"
             }
         };
 
@@ -786,7 +851,7 @@
             return colors[Math.floor(Math.random() * colors.length)];
         }
 
-        // 🔥 Firebase 초기화 (개선된 오류 처리)
+        // 🔥 Firebase 초기화
         async function initializeFirebase() {
             try {
                 console.log('🔥 Firebase 초기화 시도 중...');
@@ -794,23 +859,14 @@
                 const app = firebase.initializeApp(firebaseConfig);
                 database = firebase.database();
                 
-                // 연결 테스트
                 await database.ref('.info/connected').once('value');
                 
-                console.log('🔥 Firebase 초기화 및 연결 테스트 완료');
+                console.log('🔥 Firebase 초기화 완료');
                 showMessage('success', '🔥 Firebase 클라우드 연결 성공!');
                 return true;
             } catch (error) {
                 console.error('Firebase 초기화 실패:', error);
-                console.error('오류 상세:', error.message);
-                
-                if (error.message.includes('permission')) {
-                    showMessage('error', 'Firebase 권한 오류. Database 규칙을 확인하세요.');
-                } else if (error.message.includes('network')) {
-                    showMessage('error', '네트워크 연결을 확인하세요.');
-                } else {
-                    showMessage('warning', 'Firebase 연결 실패. 로컬 모드로 실행됩니다.');
-                }
+                showMessage('warning', 'Firebase 연결 실패. 로컬 모드로 실행됩니다.');
                 return false;
             }
         }
@@ -845,7 +901,7 @@
             }
         }
 
-        // 💾 지갑 데이터 저장 (개선된 오류 처리)
+        // 💾 지갑 데이터 저장
         async function saveWallets() {
             try {
                 if (database) {
@@ -859,20 +915,14 @@
                 }
             } catch (error) {
                 console.error('❌ Firebase 저장 실패:', error);
-                console.error('오류 상세:', error.message);
-                
-                if (error.message.includes('permission') || error.message.includes('PERMISSION_DENIED')) {
-                    showMessage('error', '❌ Firebase 권한 오류! Database 규칙에서 write: true로 설정하세요.');
-                } else {
-                    showMessage('error', `❌ Firebase 저장 실패: ${error.message}`);
-                }
+                showMessage('error', `❌ Firebase 저장 실패: ${error.message}`);
                 return false;
             }
         }
 
         // 🔧 체인별 지갑 객체 보장
         function ensureChainWallets() {
-            ['ETH', 'BSC', 'Polygon'].forEach(chain => {
+            Object.keys(CHAIN_CONFIG).forEach(chain => {
                 if (!wallets[chain]) {
                     wallets[chain] = {};
                 }
@@ -884,18 +934,12 @@
             try {
                 updateProgressStep('step1', 'active', '1. 블록체인 연결 중...');
                 
-                const RPC_ENDPOINTS = {
-                    ETH: 'https://eth.llamarpc.com',
-                    BSC: 'https://bsc-dataseed.binance.org/',
-                    Polygon: 'https://polygon-rpc.com'
-                };
-                
-                const rpcUrl = RPC_ENDPOINTS[chain];
-                if (!rpcUrl) {
+                const chainConfig = CHAIN_CONFIG[chain];
+                if (!chainConfig) {
                     throw new Error(`지원하지 않는 체인입니다: ${chain}`);
                 }
                 
-                web3 = new Web3(rpcUrl);
+                web3 = new Web3(chainConfig.rpc);
                 currentChain = chain;
                 
                 // 연결 테스트
@@ -910,19 +954,13 @@
             }
         }
 
-        // 🪙 토큰 정보 조회 (소수점 정확도 개선)
+        // 🪙 토큰 정보 조회
         async function getTokenInfo(tokenAddress) {
             try {
                 updateProgressStep('step2', 'active', '2. 토큰 정보 조회 중...');
                 
                 if (tokenAddress === '0x0000000000000000000000000000000000000000') {
-                    const nativeTokens = {
-                        ETH: { name: 'Ethereum', symbol: 'ETH', decimals: 18 },
-                        BSC: { name: 'BNB', symbol: 'BNB', decimals: 18 },
-                        Polygon: { name: 'Polygon', symbol: 'MATIC', decimals: 18 }
-                    };
-                    
-                    const result = nativeTokens[currentChain];
+                    const result = CHAIN_CONFIG[currentChain].nativeToken;
                     updateProgressStep('step2', 'completed', '2. 토큰 정보 조회 완료');
                     return result;
                 }
@@ -930,7 +968,6 @@
                 console.log(`🔍 토큰 컨트랙트 조회: ${tokenAddress}`);
                 const contract = new web3.eth.Contract(ERC20_ABI, tokenAddress);
                 
-                // 각각 개별적으로 조회해서 오류 원인 파악
                 let name = 'Unknown';
                 let symbol = 'UNKNOWN';
                 let decimals = 18;
@@ -976,7 +1013,7 @@
             }
         }
 
-        // 💰 가격 정보 조회
+        // 💰 가격 정보 조회 (확장된 체인 지원)
         async function getTokenPrice(tokenAddress, chain) {
             try {
                 updateProgressStep('step3', 'active', '3. 가격 정보 조회 중...');
@@ -984,30 +1021,30 @@
                 let geckoId = '';
                 
                 if (tokenAddress === '0x0000000000000000000000000000000000000000') {
-                    const nativeIds = {
-                        ETH: 'ethereum',
-                        BSC: 'binancecoin',
-                        Polygon: 'matic-network'
-                    };
-                    geckoId = nativeIds[chain];
+                    geckoId = CHAIN_CONFIG[chain].geckoId;
                 } else {
                     const platformMap = {
                         ETH: 'ethereum',
                         BSC: 'binance-smart-chain',
-                        Polygon: 'polygon-pos'
+                        Polygon: 'polygon-pos',
+                        Arbitrum: 'arbitrum-one',
+                        Optimism: 'optimistic-ethereum',
+                        Avalanche: 'avalanche'
                     };
                     
                     const platform = platformMap[chain];
-                    const searchUrl = `https://api.coingecko.com/api/v3/coins/${platform}/contract/${tokenAddress}`;
-                    
-                    try {
-                        const response = await fetch(searchUrl);
-                        if (response.ok) {
-                            const tokenData = await response.json();
-                            geckoId = tokenData.id;
+                    if (platform) {
+                        const searchUrl = `https://api.coingecko.com/api/v3/coins/${platform}/contract/${tokenAddress}`;
+                        
+                        try {
+                            const response = await fetch(searchUrl);
+                            if (response.ok) {
+                                const tokenData = await response.json();
+                                geckoId = tokenData.id;
+                            }
+                        } catch (e) {
+                            console.log('토큰 검색 실패:', e);
                         }
-                    } catch (e) {
-                        console.log('토큰 검색 실패:', e);
                     }
                 }
                 
@@ -1113,7 +1150,8 @@
             document.getElementById('contractAddress').textContent = contractAddress;
             document.getElementById('tokenName').textContent = tokenInfo.name;
             document.getElementById('tokenSymbol').textContent = tokenInfo.symbol;
-            document.getElementById('tokenDecimals').textContent = tokenInfo.decimals;
+            document.getElementById('currentChainDisplay').innerHTML = 
+                `${CHAIN_CONFIG[currentChain].name} <span class="chain-badge ${currentChain.toLowerCase()}">${CHAIN_CONFIG[currentChain].nativeToken.symbol}</span>`;
         }
 
         function displayPriceInfo(priceInfo) {
@@ -1257,7 +1295,7 @@
         function resetResults() {
             document.getElementById('tokenName').textContent = '-';
             document.getElementById('tokenSymbol').textContent = '-';
-            document.getElementById('tokenDecimals').textContent = '-';
+            document.getElementById('currentChainDisplay').textContent = '-';
             document.getElementById('contractAddress').textContent = '-';
             document.getElementById('tokenPrice').textContent = '-';
             document.getElementById('priceChange').textContent = '-';
@@ -1300,14 +1338,10 @@
             let tokenAddress = input;
             
             if (!input.startsWith('0x')) {
-                const nativeTokens = {
-                    ETH: ['ETH', 'ETHEREUM'],
-                    BSC: ['BNB', 'BSC'],
-                    Polygon: ['MATIC', 'POLYGON']
-                };
+                const chainConfig = CHAIN_CONFIG[chain];
+                const nativeSymbols = [chainConfig.nativeToken.symbol, chainConfig.name.toUpperCase()];
                 
-                const chainTokens = nativeTokens[chain] || [];
-                if (chainTokens.includes(input.toUpperCase())) {
+                if (nativeSymbols.includes(input.toUpperCase())) {
                     tokenAddress = '0x0000000000000000000000000000000000000000';
                 } else {
                     showMessage('error', `${input} 토큰의 컨트랙트 주소를 직접 입력하세요.`);
@@ -1379,13 +1413,9 @@
         // 🔸 네이티브 토큰 검색
         function searchNativeToken() {
             const chain = document.getElementById('chainSelect').value;
-            const nativeTokens = {
-                ETH: 'ETH',
-                BSC: 'BNB',
-                Polygon: 'MATIC'
-            };
+            const nativeSymbol = CHAIN_CONFIG[chain].nativeToken.symbol;
             
-            document.getElementById('tokenInput').value = nativeTokens[chain];
+            document.getElementById('tokenInput').value = nativeSymbol;
             searchToken();
         }
 
@@ -1393,15 +1423,12 @@
         function updateNativeTokenButtons() {
             const chain = document.getElementById('chainSelect').value;
             const nativeButtons = document.getElementById('nativeButtons');
-            
-            const nativeTokens = {
-                ETH: 'ETH',
-                BSC: 'BNB',
-                Polygon: 'MATIC'
-            };
+            const chainConfig = CHAIN_CONFIG[chain];
             
             nativeButtons.innerHTML = `
-                <button class="native-btn" onclick="searchNativeToken()">${nativeTokens[chain]} 조회</button>
+                <button class="native-btn" onclick="searchNativeToken()" style="background-color: ${chainConfig.color}">
+                    ${chainConfig.nativeToken.symbol} 조회
+                </button>
             `;
         }
 
@@ -1426,7 +1453,7 @@
                     const item = document.createElement('div');
                     item.className = 'wallet-item';
                     item.innerHTML = `
-                        <span>${chain} - ${name}: ${address}</span>
+                        <span><span class="chain-badge ${chain.toLowerCase()}">${chain}</span> ${name}: ${address}</span>
                         <button class="delete-btn" onclick="deleteWallet('${chain}', '${name}')">삭제</button>
                     `;
                     walletList.appendChild(item);
