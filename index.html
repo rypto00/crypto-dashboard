@@ -681,7 +681,7 @@
             }
         };
 
-        // 📋 확장된 기본 거래소 지갑들
+        // 📋 확장된 기본 거래소 지갑들 (체크섬 주소로 수정)
         const defaultWallets = {
             "ETH": {
                 "Binance_Hot1": "0x28C6c06298d514Db089934071355E5743bf21d60",
@@ -691,7 +691,7 @@
                 "OKX_Hot1": "0x98EC059Dc3aDFBdd63429454aEB0c990FBA4A128",
                 "OKX_Hot2": "0x06959153B974D0D5fDfd87D561db6d8d4FA0910b",
                 "KuCoin_Hot": "0xd6216fc19db775df9774a6e33526131da7d19a2c",
-                "KuCoin_Hot2": "0xeb2629a2734e272Bcc07BDA959863f316F4bD4Cf",
+                "KuCoin_Hot2": "0xeB2629a2734e272Bcc07BDA959863f316F4bD4Cf",
                 "Bybit_Hot": "0xf89d7b9c864f589bbF53a82105107622B35EaA40",
                 "Gate.io_Hot": "0x0D0707963952f2fBA59dD06f2b425ace40b492Fe",
                 "Gate.io_Hot2": "0x1C4b70a3968436B9A0a9cf5205c787eb81Bb558c",
@@ -716,7 +716,7 @@
                 "Gate.io_Arbitrum": "0xc882b111a75c0c657fc507c04fbfcd2cc984f071"
             },
             "Optimism": {
-                "Binance_Optimism": "0xeb2629a2734e272bcc07bda959863f316f4bd4cf",
+                "Binance_Optimism": "0xeB2629a2734e272Bcc07BDA959863f316F4bD4Cf",
                 "OKX_Optimism": "0x5C69C2c9fb09230b5195474a7d1a3Bbd3C6AAa4c"
             },
             "Avalanche": {
@@ -1036,15 +1036,24 @@
             }
         }
 
-        // 💳 토큰 잔고 조회
+        // 💳 토큰 잔고 조회 (체크섬 주소 보정)
         async function getTokenBalance(tokenAddress, walletAddress, decimals) {
             try {
+                // 주소 체크섬 보정
+                let correctedAddress;
+                try {
+                    correctedAddress = web3.utils.toChecksumAddress(walletAddress);
+                } catch (e) {
+                    console.warn('주소 체크섬 변환 실패:', walletAddress, e.message);
+                    return 0;
+                }
+
                 if (tokenAddress === '0x0000000000000000000000000000000000000000') {
-                    const balance = await web3.eth.getBalance(walletAddress);
+                    const balance = await web3.eth.getBalance(correctedAddress);
                     return parseFloat(web3.utils.fromWei(balance, 'ether'));
                 } else {
                     const contract = new web3.eth.Contract(ERC20_ABI, tokenAddress);
-                    const balance = await contract.methods.balanceOf(walletAddress).call();
+                    const balance = await contract.methods.balanceOf(correctedAddress).call();
                     
                     if (balance && balance !== '0') {
                         return parseFloat(balance) / Math.pow(10, decimals);
