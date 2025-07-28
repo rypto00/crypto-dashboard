@@ -502,7 +502,7 @@
                     <option value="Polygon">Polygon</option>
                 </select>
                 <input type="text" id="tokenInput" placeholder="토큰 컨트랙트 주소 (0x...)">
-                <button id="searchBtn" onclick="searchToken()">🔍 조회</button>
+                <button id="searchBtn">🔍 조회</button>
             </div>
         </div>
 
@@ -627,7 +627,7 @@
 
         <!-- 거래소 지갑 관리 섹션 -->
         <div class="wallet-manager">
-            <div class="wallet-manager-header" onclick="toggleWalletManager()">
+            <div class="wallet-manager-header" id="walletManagerHeader">
                 <h3>📋 거래소 지갑 관리</h3>
                 <span class="toggle-icon" id="walletToggleIcon">▼</span>
             </div>
@@ -640,7 +640,7 @@
                     </select>
                     <input type="text" id="walletName" placeholder="거래소명 (예: Binance_Hot)">
                     <input type="text" id="walletAddress" placeholder="지갑 주소 (0x...)">
-                    <button onclick="addWallet()">추가</button>
+                    <button id="addWalletBtn">추가</button>
                 </div>
                 <div class="wallet-list" id="walletList"></div>
             </div>
@@ -974,7 +974,7 @@
             });
         }
 
-        // 🌐 블록체인 연결 (백업 RPC 포함)
+        // 🌐 블록체인 연결 (백업 RPC 포함, 메타마스크 충돌 방지)
         async function connectToChain(chain) {
             updateProgressStep('step1', 'active', '1. 블록체인 연결 중...');
             
@@ -988,10 +988,13 @@
                     const rpcUrl = rpcUrls[i];
                     console.log(`🔗 ${chain} RPC 연결 시도: ${rpcUrl}`);
                     
-                    // Web3 인스턴스 충돌 방지
-                    if (typeof window.ethereum !== 'undefined') {
+                    // 메타마스크 충돌 방지를 위한 안전한 Web3 초기화
+                    try {
+                        // HttpProvider로 직접 연결하여 메타마스크와의 충돌 방지
                         web3 = new Web3(new Web3.providers.HttpProvider(rpcUrl));
-                    } else {
+                    } catch (providerError) {
+                        console.warn('HttpProvider 생성 실패, 대체 방법 사용:', providerError);
+                        // 대체 방법: 기본 문자열 방식
                         web3 = new Web3(rpcUrl);
                     }
                     
@@ -1531,43 +1534,4 @@
             for (const [chain, chainWallets] of Object.entries(wallets)) {
                 for (const [name, walletAddress] of Object.entries(chainWallets)) {
                     if (walletAddress.toLowerCase().trim() === normalizedAddress) {
-                        return { chain, name };
-                    }
-                }
-            }
-            return null;
-        }
-
-        async function addWallet() {
-            const chain = document.getElementById('walletChain').value;
-            const name = document.getElementById('walletName').value.trim();
-            let address = document.getElementById('walletAddress').value.trim();
-            
-            if (!name || !address) {
-                showMessage('error', '거래소명과 주소를 모두 입력하세요.');
-                return;
-            }
-            
-            if (!address.startsWith('0x')) {
-                address = '0x' + address;
-            }
-            
-            if (address.length !== 42) {
-                showMessage('error', '올바른 주소 형식이 아닙니다. (42자리 필요)');
-                return;
-            }
-            
-            try {
-                const web3Temp = new Web3();
-                address = web3Temp.utils.toChecksumAddress(address);
-            } catch (e) {
-                showMessage('error', '유효하지 않은 이더리움 주소입니다.');
-                return;
-            }
-            
-            if (!wallets[chain]) {
-                wallets[chain] = {};
-            }
-            
-            const existingWallet = findWalletByAddress(address);
-            if (existingWallet
+                        return {
