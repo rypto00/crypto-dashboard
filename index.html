@@ -202,37 +202,27 @@
         table {
             width: 100%;
             border-collapse: collapse;
-            min-width: 600px;
+            min-width: 700px;
         }
 
         th, td {
-            padding: 12px;
+            padding: 12px 8px;
             text-align: left;
             border-bottom: 1px solid #444;
+            word-break: break-word;
+        }
+
+        /* 🎯 개선된 컬럼 너비 설정 */
+        th:nth-child(1), td:nth-child(1) { width: 40px; text-align: center; }
+        th:nth-child(2), td:nth-child(2) { width: 120px; }
+        th:nth-child(3), td:nth-child(3) { 
+            width: 180px; 
+            font-size: 11px; 
+            font-family: monospace;
             word-break: break-all;
         }
-
-        th:nth-child(1), td:nth-child(1) {
-            width: 40px;
-        }
-
-        th:nth-child(2), td:nth-child(2) {
-            width: 120px;
-        }
-
-        th:nth-child(3), td:nth-child(3) {
-            font-size: 12px;
-            font-family: monospace;
-            width: 200px;
-        }
-
-        th:nth-child(4), td:nth-child(4) {
-            width: 100px;
-        }
-
-        th:nth-child(5), td:nth-child(5) {
-            width: 80px;
-        }
+        th:nth-child(4), td:nth-child(4) { width: 100px; text-align: right; }
+        th:nth-child(5), td:nth-child(5) { width: 80px; text-align: center; }
 
         th {
             background: #2e3545;
@@ -241,6 +231,63 @@
 
         tr:hover {
             background: #2e3545;
+        }
+
+        /* 🎯 개선된 DeBAnk 버튼 스타일 */
+        .debank-btn {
+            background: #4CAF50;
+            color: white !important;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            white-space: nowrap;
+            transition: all 0.2s;
+            min-width: 60px;
+            justify-content: center;
+        }
+
+        .debank-btn:hover {
+            background: #45a049;
+            transform: translateY(-1px);
+        }
+
+        .debank-btn::before {
+            content: "🔗";
+            font-size: 10px;
+        }
+
+        /* 주소 줄임 처리 */
+        .address-cell {
+            position: relative;
+            cursor: pointer;
+        }
+
+        .address-short {
+            display: block;
+        }
+
+        .address-full {
+            display: none;
+            position: absolute;
+            background: #1a1f2e;
+            border: 1px solid #444;
+            border-radius: 4px;
+            padding: 8px;
+            z-index: 1000;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            font-size: 10px;
+            word-break: break-all;
+            min-width: 300px;
+            top: 100%;
+            left: 0;
+        }
+
+        .address-cell:hover .address-full {
+            display: block;
         }
 
         .wallet-manager {
@@ -451,6 +498,33 @@
         .status-indicator.connecting {
             background: #ff9800;
             animation: pulse 1s infinite;
+        }
+
+        /* 🎯 모바일 최적화 */
+        @media (max-width: 768px) {
+            .table-container {
+                padding: 10px;
+            }
+            
+            table {
+                min-width: 600px;
+            }
+            
+            th, td {
+                padding: 8px 4px;
+                font-size: 12px;
+            }
+            
+            .debank-btn {
+                padding: 4px 6px;
+                font-size: 10px;
+                min-width: 50px;
+            }
+            
+            th:nth-child(3), td:nth-child(3) { 
+                width: 120px;
+                font-size: 10px;
+            }
         }
     </style>
 </head>
@@ -827,6 +901,12 @@
                 '#FF9F40', '#FF6384', '#C9CBCF', '#4BC0C0', '#36A2EB'
             ];
             return colors[Math.floor(Math.random() * colors.length)];
+        }
+
+        // 🎯 주소 줄임 표시 함수
+        function formatAddress(address) {
+            if (!address || address.length < 10) return address;
+            return address.slice(0, 6) + '...' + address.slice(-4);
         }
 
         // 🔥 Firebase 초기화
@@ -1336,507 +1416,10 @@ Gate.io_Hot,0x0D0707963952f2fBA59dD06f2b425ace40b492Fe`;
         function displayPriceInfo(priceInfo) {
             if (priceInfo) {
                 document.getElementById('tokenPrice').textContent = 
-                    priceInfo.price < 0.01 ? '$' + priceInfo.price.toFixed(8) : '$' + priceInfo.price.toFixed(2);
+                    priceInfo.price < 0.01 ? ' + priceInfo.price.toFixed(8) : ' + priceInfo.price.toFixed(2);
                 document.getElementById('priceChange').innerHTML = 
                     (priceInfo.change24h > 0 ? '🟢' : '🔴') + ' ' + priceInfo.change24h.toFixed(2) + '%';
                 document.getElementById('marketCap').textContent = 
-                    '$' + formatNumber(priceInfo.marketCap);
+                    ' + formatNumber(priceInfo.marketCap);
                 document.getElementById('fdv').textContent = 
-                    '$' + formatNumber(priceInfo.fdv);
-            } else {
-                document.getElementById('tokenPrice').textContent = '가격 정보 없음';
-                document.getElementById('priceChange').textContent = '-';
-                document.getElementById('marketCap').textContent = '-';
-                document.getElementById('fdv').textContent = '-';
-            }
-        }
-
-        function displayBalances(balances, tokenPrice = 0) {
-            if (Object.keys(balances).length === 0) {
-                showMessage('warning', '거래소에서 해당 토큰을 찾을 수 없습니다.');
-                return;
-            }
-            
-            const sortedBalances = Object.entries(balances).sort((a, b) => b[1] - a[1]);
-            const totalBalance = sortedBalances.reduce((sum, [name, balance]) => sum + balance, 0);
-            
-            document.getElementById('totalBalance').textContent = formatNumber(totalBalance);
-            document.getElementById('totalValue').textContent = '$' + formatNumber(totalBalance * tokenPrice);
-            document.getElementById('exchangeCount').textContent = Object.keys(balances).length;
-            
-            updateChart(sortedBalances, totalBalance);
-            fillTable(sortedBalances);
-            
-            showMessage('success', '총 ' + Object.keys(balances).length + '개 거래소에서 토큰을 발견했습니다!');
-        }
-
-        function updateChart(balances, total) {
-            const ctx = document.getElementById('chartCanvas').getContext('2d');
-            
-            const labels = [];
-            const data = [];
-            const colors = [];
-            
-            const displayBalances = balances.slice(0, 10);
-            
-            displayBalances.forEach(([name, balance]) => {
-                labels.push(name);
-                data.push(balance);
-                colors.push(getRandomColor());
-            });
-            
-            if (!chart) {
-                chart = new Chart(ctx, {
-                    type: 'doughnut',
-                    data: {
-                        labels: labels,
-                        datasets: [{
-                            data: data,
-                            backgroundColor: colors,
-                            borderWidth: 2,
-                            borderColor: '#1a1f2e'
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: {
-                                display: true,
-                                position: 'right',
-                                labels: {
-                                    color: '#ffffff',
-                                    generateLabels: function(chart) {
-                                        const data = chart.data;
-                                        if (data.labels.length && data.datasets.length) {
-                                            return data.labels.map((label, i) => {
-                                                const value = data.datasets[0].data[i];
-                                                const percentage = ((value / total) * 100).toFixed(1);
-                                                return {
-                                                    text: label + ': ' + formatNumber(value) + ' (' + percentage + '%)',
-                                                    fillStyle: data.datasets[0].backgroundColor[i],
-                                                    strokeStyle: data.datasets[0].backgroundColor[i],
-                                                    fontColor: '#ffffff',
-                                                    index: i
-                                                };
-                                            });
-                                        }
-                                        return [];
-                                    }
-                                }
-                            },
-                            title: {
-                                display: true,
-                                text: currentChain + ' - Token Distribution',
-                                color: '#ffffff',
-                                font: { size: 16 }
-                            }
-                        }
-                    }
-                });
-            } else {
-                chart.data.labels = labels;
-                chart.data.datasets[0].data = data;
-                chart.data.datasets[0].backgroundColor = colors;
-                chart.update();
-            }
-        }
-
-        function fillTable(balances) {
-            const tbody = document.getElementById('tableBody');
-            tbody.innerHTML = '';
-            
-            balances.forEach(([name, balance], index) => {
-                const address = wallets.EVM[name] || '주소 없음';
-                const debankUrl = address !== '주소 없음' ? 'https://debank.com/profile/' + address : '#';
-                const row = tbody.insertRow();
-                row.innerHTML = `
-                    <td>${index + 1}</td>
-                    <td>${name}</td>
-                    <td style="font-family: monospace; font-size: 11px;">${address}</td>
-                    <td><strong>${formatNumber(balance)}</strong></td>
-                    <td>
-                        ${address !== '주소 없음' ? 
-                            '<a href="' + debankUrl + '" target="_blank" style="color: #4CAF50; text-decoration: none;">🔗 보기</a>' : 
-                            '-'
-                        }
-                    </td>
-                `;
-            });
-        }
-
-        function resetResults() {
-            document.getElementById('tokenName').textContent = '-';
-            document.getElementById('tokenSymbol').textContent = '-';
-            document.getElementById('currentChainDisplay').textContent = '-';
-            document.getElementById('contractAddress').textContent = '-';
-            document.getElementById('tokenPrice').textContent = '-';
-            document.getElementById('priceChange').textContent = '-';
-            document.getElementById('marketCap').textContent = '-';
-            document.getElementById('fdv').textContent = '-';
-            document.getElementById('totalBalance').textContent = '0';
-            document.getElementById('totalValue').textContent = '$0';
-            document.getElementById('exchangeCount').textContent = '0';
-            document.getElementById('tableBody').innerHTML = '';
-        }
-
-        // 🚀 메인 검색 함수
-        async function searchToken() {
-            if (isSearching) {
-                showMessage('warning', '이미 검색 중입니다. 잠시만 기다려주세요.');
-                return;
-            }
-            
-            const chain = document.getElementById('chainSelect').value;
-            const input = document.getElementById('tokenInput').value.trim();
-            
-            if (!input) {
-                showMessage('error', '토큰 주소를 입력하세요.');
-                return;
-            }
-            
-            isSearching = true;
-            document.getElementById('searchBtn').disabled = true;
-            hideMessage('error');
-            hideMessage('warning');
-            hideMessage('success');
-            
-            document.getElementById('detailedProgress').style.display = 'block';
-            document.getElementById('results').style.display = 'block';
-            resetResults();
-            
-            let tokenAddress = input;
-            
-            if (!input.startsWith('0x')) {
-                const chainConfig = CHAIN_CONFIG[chain];
-                const nativeSymbols = [chainConfig.nativeToken.symbol, chainConfig.name.toUpperCase()];
-                
-                if (nativeSymbols.includes(input.toUpperCase())) {
-                    tokenAddress = '0x0000000000000000000000000000000000000000';
-                } else {
-                    showMessage('error', input + ' 토큰의 컨트랙트 주소를 직접 입력하세요.');
-                    isSearching = false;
-                    document.getElementById('searchBtn').disabled = false;
-                    document.getElementById('detailedProgress').style.display = 'none';
-                    return;
-                }
-            }
-            
-            try {
-                console.log(chain + ' 체인에서 ' + tokenAddress + ' 검색 시작');
-                
-                await connectToChain(chain);
-                
-                const [tokenInfo, priceInfo] = await Promise.all([
-                    getTokenInfo(tokenAddress),
-                    getTokenPrice(tokenAddress, chain)
-                ]);
-                
-                displayTokenInfo(tokenInfo, tokenAddress);
-                displayPriceInfo(priceInfo);
-                
-                const chainWallets = wallets.EVM || {};
-                
-                if (Object.keys(chainWallets).length === 0) {
-                    throw new Error('등록된 EVM 지갑이 없습니다.');
-                }
-                
-                document.getElementById('progressSection').style.display = 'block';
-                
-                const balances = await getBalancesParallel(
-                    tokenAddress, 
-                    chainWallets, 
-                    tokenInfo.decimals,
-                    10
-                );
-                
-                displayBalances(balances, priceInfo ? priceInfo.price : 0);
-                
-                setTimeout(() => {
-                    document.getElementById('progressSection').style.display = 'none';
-                    document.getElementById('detailedProgress').style.display = 'none';
-                }, 2000);
-                
-            } catch (error) {
-                console.error('검색 오류:', error);
-                
-                let errorMessage = '알 수 없는 오류가 발생했습니다.';
-                
-                if (error.message.includes('연결')) {
-                    errorMessage = chain + ' 블록체인 연결에 실패했습니다. 잠시 후 다시 시도해주세요.';
-                } else if (error.message.includes('토큰 정보')) {
-                    errorMessage = '유효하지 않은 토큰 주소입니다. 컨트랙트 주소를 확인해주세요.';
-                } else if (error.message.includes('지갑')) {
-                    errorMessage = chain + ' 체인에 등록된 지갑이 없습니다. 지갑을 먼저 추가해주세요.';
-                } else {
-                    errorMessage = error.message;
-                }
-                
-                showMessage('error', errorMessage);
-                document.getElementById('detailedProgress').style.display = 'none';
-            } finally {
-                isSearching = false;
-                document.getElementById('searchBtn').disabled = false;
-            }
-        }
-
-        // 💼 EVM 지갑 관리 함수들
-        let editingWallet = null; // 편집 중인 지갑 추적
-
-        function displayWallets() {
-            const walletList = document.getElementById('walletList');
-            walletList.innerHTML = '';
-            
-            const evmWallets = wallets.EVM || {};
-            const totalCount = Object.keys(evmWallets).length;
-            
-            const countDiv = document.createElement('div');
-            countDiv.style.marginBottom = '10px';
-            countDiv.style.color = '#aaa';
-            countDiv.textContent = '총 ' + totalCount + '개의 EVM 지갑이 등록되어 있습니다.';
-            walletList.appendChild(countDiv);
-            
-            Object.entries(evmWallets).forEach(([name, address]) => {
-                const item = document.createElement('div');
-                item.className = 'wallet-item';
-                item.innerHTML = `
-                    <span><span class="chain-badge" style="background: #627EEA;">EVM</span> ${name}: ${address}</span>
-                    <div class="wallet-actions">
-                        <button class="edit-btn" onclick="editWallet('${name}')">편집</button>
-                        <button class="delete-btn" onclick="deleteWallet('${name}')">삭제</button>
-                    </div>
-                `;
-                walletList.appendChild(item);
-            });
-        }
-
-        function editWallet(name) {
-            editingWallet = name;
-            
-            // 기존 데이터를 입력폼에 로드
-            document.getElementById('walletName').value = name;
-            document.getElementById('walletAddress').value = wallets.EVM[name];
-            
-            // 버튼 텍스트 및 기능 변경
-            const actionBtn = document.getElementById('walletActionBtn');
-            const cancelBtn = document.getElementById('walletCancelBtn');
-            
-            actionBtn.textContent = '수정 완료';
-            actionBtn.onclick = updateWallet;
-            actionBtn.style.background = '#2196F3';
-            
-            cancelBtn.style.display = 'inline-block';
-            
-            // 입력창 포커스
-            document.getElementById('walletName').focus();
-            
-            showMessage('success', name + ' 지갑을 편집 중입니다. 수정 후 "수정 완료"를 클릭하세요.');
-        }
-
-        function cancelEdit() {
-            editingWallet = null;
-            
-            // 입력폼 초기화
-            document.getElementById('walletName').value = '';
-            document.getElementById('walletAddress').value = '';
-            
-            // 버튼 원상복구
-            const actionBtn = document.getElementById('walletActionBtn');
-            const cancelBtn = document.getElementById('walletCancelBtn');
-            
-            actionBtn.textContent = '추가';
-            actionBtn.onclick = addWallet;
-            actionBtn.style.background = '#3b4252';
-            
-            cancelBtn.style.display = 'none';
-            
-            showMessage('success', '편집이 취소되었습니다.');
-        }
-
-        async function updateWallet() {
-            const newName = document.getElementById('walletName').value.trim();
-            let newAddress = document.getElementById('walletAddress').value.trim();
-            
-            if (!newName || !newAddress) {
-                showMessage('error', '거래소명과 주소를 모두 입력하세요.');
-                return;
-            }
-            
-            if (!newAddress.startsWith('0x')) {
-                newAddress = '0x' + newAddress;
-            }
-            
-            if (newAddress.length !== 42) {
-                showMessage('error', '올바른 주소 형식이 아닙니다. (42자리 필요)');
-                return;
-            }
-            
-            try {
-                const web3Temp = new Web3();
-                newAddress = web3Temp.utils.toChecksumAddress(newAddress);
-            } catch (e) {
-                showMessage('error', '유효하지 않은 이더리움 주소입니다.');
-                return;
-            }
-            
-            // 주소 중복 확인 (편집 중인 지갑 제외)
-            const existingWallet = findWalletByAddressEVM(newAddress);
-            if (existingWallet && existingWallet.name !== editingWallet) {
-                showMessage('error', '이미 등록된 주소입니다! (EVM - ' + existingWallet.name + ')');
-                return;
-            }
-            
-            // 이름 중복 확인 (편집 중인 지갑 제외)
-            if (wallets.EVM[newName] && newName !== editingWallet) {
-                showMessage('error', 'EVM에 이미 ' + newName + ' 이름이 존재합니다.');
-                return;
-            }
-            
-            // 기존 지갑 삭제 (이름이 변경된 경우)
-            if (newName !== editingWallet) {
-                delete wallets.EVM[editingWallet];
-            }
-            
-            // 새 지갑 정보 저장
-            wallets.EVM[newName] = newAddress;
-            
-            const saved = await saveWallets();
-            if (saved) {
-                showMessage('success', 'EVM - ' + newName + ' 지갑이 수정되었습니다!');
-            } else {
-                showMessage('warning', '지갑은 수정되었지만 클라우드 동기화에 실패했습니다.');
-            }
-            
-            displayWallets();
-            cancelEdit(); // 편집 모드 종료
-        }
-
-        function findWalletByAddress(address) {
-            return findWalletByAddressEVM(address);
-        }
-
-        async function addWallet() {
-            const name = document.getElementById('walletName').value.trim();
-            let address = document.getElementById('walletAddress').value.trim();
-            
-            if (!name || !address) {
-                showMessage('error', '거래소명과 주소를 모두 입력하세요.');
-                return;
-            }
-            
-            if (!address.startsWith('0x')) {
-                address = '0x' + address;
-            }
-            
-            if (address.length !== 42) {
-                showMessage('error', '올바른 주소 형식이 아닙니다. (42자리 필요)');
-                return;
-            }
-            
-            try {
-                const web3Temp = new Web3();
-                address = web3Temp.utils.toChecksumAddress(address);
-            } catch (e) {
-                showMessage('error', '유효하지 않은 이더리움 주소입니다.');
-                return;
-            }
-            
-            if (!wallets.EVM) {
-                wallets.EVM = {};
-            }
-            
-            const existingWallet = findWalletByAddressEVM(address);
-            if (existingWallet) {
-                showMessage('error', '이미 등록된 주소입니다! (EVM - ' + existingWallet.name + ')');
-                return;
-            }
-            
-            if (wallets.EVM[name]) {
-                showMessage('error', 'EVM에 이미 ' + name + ' 이름이 존재합니다.');
-                return;
-            }
-            
-            wallets.EVM[name] = address;
-            
-            const saved = await saveWallets();
-            if (saved) {
-                showMessage('success', 'EVM - ' + name + ' 지갑이 추가되었습니다!');
-            } else {
-                showMessage('warning', '지갑은 추가되었지만 클라우드 동기화에 실패했습니다.');
-            }
-            
-            displayWallets();
-            
-            document.getElementById('walletName').value = '';
-            document.getElementById('walletAddress').value = '';
-        }
-
-        async function deleteWallet(name) {
-            if (confirm('EVM - ' + name + ' 지갑을 삭제하시겠습니까?')) {
-                delete wallets.EVM[name];
-                
-                const saved = await saveWallets();
-                if (saved) {
-                    showMessage('success', '지갑이 삭제되었습니다!');
-                } else {
-                    showMessage('warning', '지갑은 삭제되었지만 클라우드 동기화에 실패했습니다.');
-                }
-                
-                displayWallets();
-                
-                // 편집 중인 지갑이 삭제된 경우 편집 모드 취소
-                if (editingWallet === name) {
-                    cancelEdit();
-                }
-            }
-        }
-
-        function toggleWalletManager() {
-            const content = document.getElementById('walletManagerContent');
-            const icon = document.getElementById('walletToggleIcon');
-            
-            content.classList.toggle('collapsed');
-            icon.classList.toggle('collapsed');
-        }
-
-        // CSV 업로드 섹션 토글
-        function toggleCSVUpload() {
-            const content = document.getElementById('csvUploadContent');
-            const icon = document.getElementById('csvToggleIcon');
-            
-            if (content.style.maxHeight === '0px' || !content.style.maxHeight) {
-                content.style.maxHeight = '200px';
-                icon.textContent = '📂';
-                icon.style.transform = 'rotate(0deg)';
-            } else {
-                content.style.maxHeight = '0px';
-                icon.textContent = '📁';
-                icon.style.transform = 'rotate(-90deg)';
-            }
-        }
-
-        // 🚀 초기화
-        window.onload = async function() {
-            console.log('핫월렛 대시보드 시작...');
-            
-            try {
-                const firebaseOk = await initializeFirebase();
-                await loadWallets();
-                
-                // Enter 키 지원
-                document.getElementById('tokenInput').addEventListener('keypress', function(e) {
-                    if (e.key === 'Enter') {
-                        searchToken();
-                    }
-                });
-                
-                console.log('대시보드 초기화 완료!');
-                
-            } catch (error) {
-                console.error('초기화 오류:', error);
-                showMessage('error', '시스템 초기화에 실패했습니다.');
-            }
-        };
-    </script>
-</body>
-</html>
+                    ' + formatNumber(priceInfo.
