@@ -766,6 +766,7 @@
 
         // 🔧 유틸리티 함수들
         function showMessage(type, message) {
+            console.log(`[${type.toUpperCase()}] ${message}`);
             const messageDiv = document.getElementById(type);
             if (messageDiv) {
                 messageDiv.textContent = message;
@@ -782,6 +783,7 @@
         }
 
         function updateProgressStep(stepId, status, message = '') {
+            console.log(`Progress: ${stepId} - ${status} - ${message}`);
             const step = document.getElementById(stepId);
             if (!step) return;
             
@@ -990,11 +992,9 @@
                     
                     // 메타마스크 충돌 방지를 위한 안전한 Web3 초기화
                     try {
-                        // HttpProvider로 직접 연결하여 메타마스크와의 충돌 방지
                         web3 = new Web3(new Web3.providers.HttpProvider(rpcUrl));
                     } catch (providerError) {
                         console.warn('HttpProvider 생성 실패, 대체 방법 사용:', providerError);
-                        // 대체 방법: 기본 문자열 방식
                         web3 = new Web3(rpcUrl);
                     }
                     
@@ -1400,6 +1400,8 @@
 
         // 🚀 메인 검색 함수
         async function searchToken() {
+            console.log('🚀 searchToken 함수 호출됨!');
+            
             if (isSearching) {
                 showMessage('warning', '이미 검색 중입니다. 잠시만 기다려주세요.');
                 return;
@@ -1415,6 +1417,8 @@
             
             const chain = chainSelect.value;
             const input = tokenInput.value.trim();
+            
+            console.log(`체인: ${chain}, 입력: ${input}`);
             
             if (!input) {
                 showMessage('error', '토큰 주소를 입력하세요.');
@@ -1534,4 +1538,44 @@
             for (const [chain, chainWallets] of Object.entries(wallets)) {
                 for (const [name, walletAddress] of Object.entries(chainWallets)) {
                     if (walletAddress.toLowerCase().trim() === normalizedAddress) {
-                        return {
+                        return { chain, name };
+                    }
+                }
+            }
+            return null;
+        }
+
+        async function addWallet() {
+            const chain = document.getElementById('walletChain').value;
+            const name = document.getElementById('walletName').value.trim();
+            let address = document.getElementById('walletAddress').value.trim();
+            
+            if (!name || !address) {
+                showMessage('error', '거래소명과 주소를 모두 입력하세요.');
+                return;
+            }
+            
+            if (!address.startsWith('0x')) {
+                address = '0x' + address;
+            }
+            
+            if (address.length !== 42) {
+                showMessage('error', '올바른 주소 형식이 아닙니다. (42자리 필요)');
+                return;
+            }
+            
+            try {
+                const web3Temp = new Web3();
+                address = web3Temp.utils.toChecksumAddress(address);
+            } catch (e) {
+                showMessage('error', '유효하지 않은 이더리움 주소입니다.');
+                return;
+            }
+            
+            if (!wallets[chain]) {
+                wallets[chain] = {};
+            }
+            
+            const existingWallet = findWalletByAddress(address);
+            if (existingWallet) {
+                showMessage('error', `이
