@@ -602,7 +602,29 @@
                     <input type="text" id="walletAddress" placeholder="지갑 주소 (0x...)">
                     <button onclick="addWallet()">추가</button>
                 </div>
+                
                 <div class="wallet-list" id="walletList"></div>
+                
+                <!-- CSV 일괄 업로드 섹션 (맨 아래로 이동) -->
+                <div style="margin: 15px 0 0 0;">
+                    <div onclick="toggleCSVUpload()" style="cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 8px; background: #2e3545; border-radius: 5px; font-size: 13px;">
+                        <span id="csvToggleIcon" style="transition: transform 0.3s;">📁</span>
+                        <span style="color: #aaa;">CSV 일괄 업로드</span>
+                    </div>
+                    <div id="csvUploadContent" style="max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out;">
+                        <div style="margin-top: 10px; padding: 12px; background: #1a1f2e; border-radius: 8px; border: 1px solid #444;">
+                            <p style="font-size: 11px; color: #aaa; margin-bottom: 8px;">
+                                형식: chain,name,address (eth, bsc, polygon 등 소문자도 OK!)
+                            </p>
+                            <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px;">
+                                <input type="file" id="csvFile" accept=".csv" style="background: #2e3545; padding: 6px; border-radius: 4px; border: 1px solid #444; color: white; font-size: 12px;">
+                                <button onclick="uploadCSV()" style="background: #4CAF50; padding: 6px 12px; font-size: 12px;">업로드</button>
+                                <button onclick="downloadTemplate()" style="background: #2196F3; padding: 6px 12px; font-size: 12px;">템플릿</button>
+                            </div>
+                            <div id="uploadStatus" style="font-size: 11px;"></div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -875,6 +897,198 @@
                 console.error('Firebase 저장 실패:', error);
                 showMessage('error', 'Firebase 저장 실패: ' + error.message);
                 return false;
+            }
+        }
+
+        // 🔧 체인명 자동 변환 (대소문자 상관없이)
+        function normalizeChain(chainName) {
+            const mapping = {
+                'eth': 'ETH',
+                'ethereum': 'ETH', 
+                'bsc': 'BSC',
+                'binance smart chain': 'BSC',
+                'polygon': 'Polygon',
+                'matic': 'Polygon',
+                'arbitrum': 'Arbitrum',
+                'arb': 'Arbitrum',
+                'optimism': 'Optimism',
+                'op': 'Optimism',
+                'avalanche': 'Avalanche',
+                'avax': 'Avalanche'
+            };
+            return mapping[chainName.toLowerCase()] || chainName;
+        }
+
+        // 📁 CSV 템플릿 다운로드
+        function downloadTemplate() {
+            const csvContent = `chain,name,address
+eth,Binance_Hot1,0x28C6c06298d514Db089934071355E5743bf21d60
+bsc,OKX_BSC,0x8894E0a0c962CB723c1976a4421c95949bE2D4E3
+polygon,MyPolygon_Wallet,0xe7804c37c13166fF0b37F5aE0BB07A3aEbb6e245
+arbitrum,Gate_Arbitrum,0xB38e8c17e38363aF6EbdCb3dAE12e0243582891D`;
+            
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', 'wallet_template.csv');
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            showMessage('success', '템플릿 파일이 다운로드되었습니다!');
+        }
+
+        // 📁 CSV 업로드 및 처리
+        async function uploadCSV() {
+            const fileInput = document.getElementById('csvFile');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                showMessage('error', 'CSV 파일을 선택하세요.');
+                return;
+            }
+            
+            if (!file.name.endsWith('.csv')) {
+                showMessage('error', 'CSV 파일만 업로드 가능합니다.');
+                return;
+            }
+            
+            try {
+                document.getElementById('uploadStatus').innerHTML = '<span style="color: #ff9800;">📤 파일 처리 중...</span>';
+                
+                const text = await file.text();
+                const lines = text.split('\n').filter(line => line.trim());
+                
+                if (lines.length < 2) {
+                    throw new Error('CSV 파일에 데이터가 없습니다.');
+                }
+                
+                // 헤더 확인
+                const headers = lines[0].toLowerCase().split(',').map(h => h.trim());
+                const expectedHeaders = ['chain', 'name', 'address'];
+                
+                if (!expectedHeaders.every(header => headers.includes(header))) {
+                    throw new Error('CSV 헤더가 올바르지 않습니다. chain,name,address 형식이어야 합니다.');
+                }
+                
+                // 데이터 처리
+                let addedCount = 0;
+                let errorCount = 0;
+                const errors = [];
+                
+                for (let i = 1; i < lines.length; i++) {
+                    try {
+                        const values = lines[i].split(',').map(v => v.trim());
+                        
+                        if (values.length < 3) continue;
+                        
+                        const chainIndex = headers.indexOf('chain');
+                        const nameIndex = headers.indexOf('name');
+                        const addressIndex = headers.indexOf('address');
+                        
+                        let chain = values[chainIndex];
+                        const name = values[nameIndex];
+                        let address = values[addressIndex];
+                        
+                        // 체인명 자동 변환
+                        chain = normalizeChain(chain);
+                        
+                        // 유효성 검사
+                        if (!CHAIN_CONFIG[chain]) {
+                            errors.push('줄 ' + (i+1) + ': 지원하지 않는 체인 "' + values[chainIndex] + '"');
+                            errorCount++;
+                            continue;
+                        }
+                        
+                        if (!name) {
+                            errors.push('줄 ' + (i+1) + ': 거래소명이 비어있습니다.');
+                            errorCount++;
+                            continue;
+                        }
+                        
+                        if (!address || !address.startsWith('0x')) {
+                            errors.push('줄 ' + (i+1) + ': 올바르지 않은 주소 형식');
+                            errorCount++;
+                            continue;
+                        }
+                        
+                        // 주소 체크섬 변환
+                        try {
+                            const web3Temp = new Web3();
+                            address = web3Temp.utils.toChecksumAddress(address);
+                        } catch (e) {
+                            errors.push('줄 ' + (i+1) + ': 유효하지 않은 주소');
+                            errorCount++;
+                            continue;
+                        }
+                        
+                        // 중복 확인
+                        const existingWallet = findWalletByAddress(address);
+                        if (existingWallet) {
+                            errors.push('줄 ' + (i+1) + ': 이미 등록된 주소 (' + existingWallet.chain + ' - ' + existingWallet.name + ')');
+                            errorCount++;
+                            continue;
+                        }
+                        
+                        // 지갑 추가
+                        if (!wallets[chain]) {
+                            wallets[chain] = {};
+                        }
+                        
+                        if (wallets[chain][name]) {
+                            errors.push('줄 ' + (i+1) + ': ' + chain + ' 체인에 이미 ' + name + ' 이름이 존재합니다.');
+                            errorCount++;
+                            continue;
+                        }
+                        
+                        wallets[chain][name] = address;
+                        addedCount++;
+                        
+                    } catch (error) {
+                        errors.push('줄 ' + (i+1) + ': ' + error.message);
+                        errorCount++;
+                    }
+                }
+                
+                // Firebase에 저장
+                if (addedCount > 0) {
+                    const saved = await saveWallets();
+                    displayWallets();
+                    
+                    let statusMessage = '✅ ' + addedCount + '개 지갑이 추가되었습니다!';
+                    if (errorCount > 0) {
+                        statusMessage += ' (' + errorCount + '개 오류)';
+                    }
+                    if (!saved) {
+                        statusMessage += ' (클라우드 동기화 실패)';
+                    }
+                    
+                    showMessage('success', statusMessage);
+                    
+                    // 상세 오류 표시
+                    if (errors.length > 0 && errors.length <= 5) {
+                        document.getElementById('uploadStatus').innerHTML = 
+                            '<span style="color: #ff9800;">⚠️ 오류:</span><br>' + 
+                            errors.slice(0, 5).map(e => '<span style="font-size: 11px;">' + e + '</span>').join('<br>');
+                    } else if (errors.length > 5) {
+                        document.getElementById('uploadStatus').innerHTML = 
+                            '<span style="color: #ff9800;">⚠️ ' + errors.length + '개의 오류가 있습니다. 처음 5개:</span><br>' + 
+                            errors.slice(0, 5).map(e => '<span style="font-size: 11px;">' + e + '</span>').join('<br>');
+                    } else {
+                        document.getElementById('uploadStatus').innerHTML = '<span style="color: #4CAF50;">✅ 모든 지갑이 성공적으로 추가되었습니다!</span>';
+                    }
+                } else {
+                    throw new Error('추가된 지갑이 없습니다. CSV 형식을 확인하세요.');
+                }
+                
+                // 파일 입력 초기화
+                fileInput.value = '';
+                
+            } catch (error) {
+                showMessage('error', 'CSV 업로드 실패: ' + error.message);
+                document.getElementById('uploadStatus').innerHTML = '<span style="color: #f44336;">❌ 업로드 실패: ' + error.message + '</span>';
             }
         }
 
@@ -1487,6 +1701,22 @@
             
             content.classList.toggle('collapsed');
             icon.classList.toggle('collapsed');
+        }
+
+        // CSV 업로드 섹션 토글
+        function toggleCSVUpload() {
+            const content = document.getElementById('csvUploadContent');
+            const icon = document.getElementById('csvToggleIcon');
+            
+            if (content.style.maxHeight === '0px' || !content.style.maxHeight) {
+                content.style.maxHeight = '200px';
+                icon.textContent = '📂';
+                icon.style.transform = 'rotate(0deg)';
+            } else {
+                content.style.maxHeight = '0px';
+                icon.textContent = '📁';
+                icon.style.transform = 'rotate(-90deg)';
+            }
         }
 
         // 🚀 초기화
