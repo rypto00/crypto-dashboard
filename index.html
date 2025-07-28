@@ -1099,6 +1099,62 @@ Gate.io_Hot,0x0D0707963952f2fBA59dD06f2b425ace40b492Fe`;
             }
         }
 
+        // 🎛️ 임계값 조절 함수들
+        function changeThreshold(delta) {
+            const input = document.getElementById('thresholdInput');
+            const currentValue = parseInt(input.value) || 0;
+            const newValue = Math.max(0, currentValue + delta);
+            input.value = newValue;
+        }
+
+        function applyThreshold() {
+            const input = document.getElementById('thresholdInput');
+            const newThreshold = parseInt(input.value) || 0;
+            
+            if (newThreshold < 0) {
+                showMessage('error', '임계값은 0 이상이어야 합니다.');
+                input.value = balanceThreshold;
+                return;
+            }
+            
+            balanceThreshold = newThreshold;
+            
+            // 상태 메시지 업데이트
+            document.getElementById('thresholdStatus').textContent = 
+                '현재: ' + balanceThreshold + '개 이상 보유한 거래소만 표시 중';
+            
+            // 마지막 검색 결과가 있으면 다시 필터링해서 표시
+            if (window.lastSearchResults) {
+                const allResults = window.lastSearchResults.allResults;
+                const tokenPrice = window.lastSearchResults.tokenPrice;
+                
+                // 새로운 임계값으로 필터링
+                const filteredResults = {};
+                Object.entries(allResults).forEach(([name, balance]) => {
+                    if (balance >= balanceThreshold) {
+                        filteredResults[name] = balance;
+                    }
+                });
+                
+                // 결과 다시 표시
+                displayBalances(filteredResults, tokenPrice);
+                
+                showMessage('success', '임계값이 ' + balanceThreshold + '개로 변경되었습니다!');
+            } else {
+                showMessage('success', '임계값이 ' + balanceThreshold + '개로 설정되었습니다. 다음 검색부터 적용됩니다.');
+            }
+        }
+
+        // Enter 키로 임계값 적용
+        function setupThresholdInput() {
+            const input = document.getElementById('thresholdInput');
+            input.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    applyThreshold();
+                }
+            });
+        }
+
         // 🔧 EVM 지갑 객체 보장
         function ensureChainWallets() {
             if (!wallets.EVM) {
@@ -1401,6 +1457,15 @@ Gate.io_Hot,0x0D0707963952f2fBA59dD06f2b425ace40b492Fe`;
         function updateChart(balances, total) {
             const ctx = document.getElementById('chartCanvas').getContext('2d');
             
+            if (balances.length === 0) {
+                // 데이터가 없으면 차트 숨김
+                if (chart) {
+                    chart.destroy();
+                    chart = null;
+                }
+                return;
+            }
+            
             const labels = [];
             const data = [];
             const colors = [];
@@ -1439,7 +1504,7 @@ Gate.io_Hot,0x0D0707963952f2fBA59dD06f2b425ace40b492Fe`;
                                         if (data.labels.length && data.datasets.length) {
                                             return data.labels.map((label, i) => {
                                                 const value = data.datasets[0].data[i];
-                                                const percentage = ((value / total) * 100).toFixed(1);
+                                                const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : '0';
                                                 return {
                                                     text: label + ': ' + formatNumber(value) + ' (' + percentage + '%)',
                                                     fillStyle: data.datasets[0].backgroundColor[i],
@@ -1506,6 +1571,12 @@ Gate.io_Hot,0x0D0707963952f2fBA59dD06f2b425ace40b492Fe`;
             document.getElementById('totalValue').textContent = '$0';
             document.getElementById('exchangeCount').textContent = '0';
             document.getElementById('tableBody').innerHTML = '';
+            
+            // 차트 초기화
+            if (chart) {
+                chart.destroy();
+                chart = null;
+            }
         }
 
         // 🚀 메인 검색 함수
@@ -1595,7 +1666,7 @@ Gate.io_Hot,0x0D0707963952f2fBA59dD06f2b425ace40b492Fe`;
                 } else if (error.message.includes('토큰 정보')) {
                     errorMessage = '유효하지 않은 토큰 주소입니다. 컨트랙트 주소를 확인해주세요.';
                 } else if (error.message.includes('지갑')) {
-                    errorMessage = chain + ' 체인에 등록된 지갑이 없습니다. 지갑을 먼저 추가해주세요.';
+                    errorMessage = '등록된 EVM 지갑이 없습니다. 지갑을 먼저 추가해주세요.';
                 } else {
                     errorMessage = error.message;
                 }
@@ -1850,6 +1921,9 @@ Gate.io_Hot,0x0D0707963952f2fBA59dD06f2b425ace40b492Fe`;
             try {
                 const firebaseOk = await initializeFirebase();
                 await loadWallets();
+                
+                // 임계값 입력창 이벤트 설정
+                setupThresholdInput();
                 
                 // Enter 키 지원
                 document.getElementById('tokenInput').addEventListener('keypress', function(e) {
