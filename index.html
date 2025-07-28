@@ -497,11 +497,8 @@
                     <option value="Optimism">Optimism <span class="chain-badge optimism">OP</span></option>
                     <option value="Avalanche">Avalanche <span class="chain-badge avalanche">AVAX</span></option>
                 </select>
-                <input type="text" id="tokenInput" placeholder="토큰 컨트랙트 주소 (0x...) 또는 네이티브 토큰명">
+                <input type="text" id="tokenInput" placeholder="토큰 컨트랙트 주소 (0x...) 또는 네이티브 토큰명 (ETH, BNB, MATIC 등)">
                 <button id="searchBtn" onclick="searchToken()">🔍 조회</button>
-            </div>
-            <div class="native-token-buttons" id="nativeButtons">
-                <!-- 동적으로 생성됨 -->
             </div>
         </div>
 
@@ -1560,7 +1557,6 @@
             try {
                 const firebaseOk = await initializeFirebase();
                 await loadWallets();
-                updateNativeTokenButtons();
                 
                 // Enter 키 지원
                 document.getElementById('tokenInput').addEventListener('keypress', function(e) {
