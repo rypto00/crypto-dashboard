@@ -176,10 +176,13 @@
             margin-bottom: 30px;
         }
 
-        @media (min-width: 768px) {
-            .chart-section {
-                grid-template-columns: 1fr 1fr;
-            }
+        .table-container {
+            background: #232937;
+            padding: 20px;
+            border-radius: 15px;
+            overflow-x: auto;
+            max-width: 100%;
+            margin-bottom: 30px;
         }
 
         .chart-container {
@@ -188,21 +191,12 @@
             border-radius: 15px;
             position: relative;
             height: 500px;
-            margin-bottom: 20px;
-        }
-
-        .table-container {
-            background: #232937;
-            padding: 20px;
-            border-radius: 15px;
-            overflow-x: auto;
-            max-width: 100%;
         }
 
         table {
             width: 100%;
             border-collapse: collapse;
-            min-width: 700px;
+            min-width: 900px;
         }
 
         th, td {
@@ -212,17 +206,17 @@
             word-break: break-word;
         }
 
-        /* 🎯 개선된 컬럼 너비 설정 */
-        th:nth-child(1), td:nth-child(1) { width: 40px; text-align: center; }
-        th:nth-child(2), td:nth-child(2) { width: 120px; }
+        /* 🎯 새로운 컬럼 너비 설정 - 주소 전체 표시 */
+        th:nth-child(1), td:nth-child(1) { width: 50px; text-align: center; }
+        th:nth-child(2), td:nth-child(2) { width: 150px; }
         th:nth-child(3), td:nth-child(3) { 
-            width: 180px; 
-            font-size: 11px; 
+            width: 400px; 
+            font-size: 12px; 
             font-family: monospace;
             word-break: break-all;
         }
-        th:nth-child(4), td:nth-child(4) { width: 100px; text-align: right; }
-        th:nth-child(5), td:nth-child(5) { width: 80px; text-align: center; }
+        th:nth-child(4), td:nth-child(4) { width: 150px; text-align: right; font-weight: bold; }
+        th:nth-child(5), td:nth-child(5) { width: 100px; text-align: center; }
 
         th {
             background: #2e3545;
@@ -233,20 +227,58 @@
             background: #2e3545;
         }
 
+        /* 🎯 주소 클릭 복사 스타일 */
+        .address-clickable {
+            cursor: pointer;
+            transition: all 0.2s;
+            padding: 4px 8px;
+            border-radius: 4px;
+            position: relative;
+        }
+
+        .address-clickable:hover {
+            background: #3b4863;
+            color: #4CAF50;
+        }
+
+        .address-clickable:active {
+            transform: scale(0.98);
+        }
+
+        .copy-tooltip {
+            position: absolute;
+            top: -30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #4CAF50;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            z-index: 1000;
+        }
+
+        .copy-tooltip.show {
+            opacity: 1;
+        }
+
         /* 🎯 개선된 DeBAnk 버튼 스타일 */
         .debank-btn {
             background: #4CAF50;
             color: white !important;
-            padding: 6px 10px;
+            padding: 8px 12px;
             border-radius: 6px;
-            font-size: 11px;
+            font-size: 12px;
             text-decoration: none;
             display: inline-flex;
             align-items: center;
             gap: 4px;
             white-space: nowrap;
             transition: all 0.2s;
-            min-width: 60px;
+            min-width: 70px;
             justify-content: center;
         }
 
@@ -257,37 +289,12 @@
 
         .debank-btn::before {
             content: "🔗";
-            font-size: 10px;
+            font-size: 11px;
         }
 
-        /* 주소 줄임 처리 */
+        /* 주소 줄임 처리 제거 - 전체 주소 표시 */
         .address-cell {
             position: relative;
-            cursor: pointer;
-        }
-
-        .address-short {
-            display: block;
-        }
-
-        .address-full {
-            display: none;
-            position: absolute;
-            background: #1a1f2e;
-            border: 1px solid #444;
-            border-radius: 4px;
-            padding: 8px;
-            z-index: 1000;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            font-size: 10px;
-            word-break: break-all;
-            min-width: 300px;
-            top: 100%;
-            left: 0;
-        }
-
-        .address-cell:hover .address-full {
-            display: block;
         }
 
         .wallet-manager {
@@ -507,7 +514,7 @@
             }
             
             table {
-                min-width: 600px;
+                min-width: 800px;
             }
             
             th, td {
@@ -516,14 +523,14 @@
             }
             
             .debank-btn {
-                padding: 4px 6px;
-                font-size: 10px;
-                min-width: 50px;
+                padding: 6px 8px;
+                font-size: 11px;
+                min-width: 60px;
             }
             
             th:nth-child(3), td:nth-child(3) { 
-                width: 120px;
-                font-size: 10px;
+                width: 350px;
+                font-size: 11px;
             }
         }
     </style>
@@ -647,9 +654,6 @@
 
             <!-- 차트와 테이블 -->
             <div class="chart-section">
-                <div class="chart-container">
-                    <canvas id="chartCanvas" style="max-height: 450px;"></canvas>
-                </div>
                 <div class="table-container">
                     <h3>📋 Exchange Status</h3>
                     <div style="overflow-x: auto;">
@@ -667,6 +671,10 @@
                             </tbody>
                         </table>
                     </div>
+                </div>
+                
+                <div class="chart-container">
+                    <canvas id="chartCanvas" style="max-height: 450px;"></canvas>
                 </div>
             </div>
         </div>
@@ -785,38 +793,9 @@
             }
         };
 
-        // 📋 EVM 통합 기본 거래소 지갑들
+        // 📋 EVM 기본 구조만 정의 (하드코딩 제거)
         const defaultWallets = {
-            "EVM": {
-                "Binance_Hot1": "0x28C6c06298d514Db089934071355E5743bf21d60",
-                "Binance_Hot2": "0x21a31Ee1afC51d94C2eFcCAa2092aD1028285549",
-                "Binance_Hot3": "0xDFd5293D8e347dFe59E90eFd55b2956a1343963d",
-                "Binance_Hot4": "0xF977814e90dA44bFA03b6295A0616a897441aceC",
-                "OKX_Hot1": "0x98EC059Dc3aDFBdd63429454aEB0c990FBA4A128",
-                "OKX_Hot2": "0x06959153B974D0D5fDfd87D561db6d8d4FA0910b",
-                "KuCoin_Hot": "0xd6216fc19db775df9774a6e33526131da7d19a2c",
-                "KuCoin_Hot2": "0xeB2629a2734e272Bcc07BDA959863f316F4bD4Cf",
-                "Bybit_Hot": "0xf89d7b9c864f589bbF53a82105107622B35EaA40",
-                "Gate.io_Hot": "0x0D0707963952f2fBA59dD06f2b425ace40b492Fe",
-                "Gate.io_Hot2": "0x1C4b70a3968436B9A0a9cf5205c787eb81Bb558c",
-                "MEXC_Hot": "0x75e89d5979e4f6fba9f97c104c2f0afb3f1dcb88",
-                "Bitget_Hot": "0x5bdf85216ec1e38d6458c870992a69e38e03f7ef",
-                "Crypto.com_Hot": "0x6262998Ced04146fA42253a5C0AF90CA02dfd2A3",
-                "Huobi_Hot": "0xE93381fB4c4F14bDa253907b18faD305D799241a",
-                "Binance_BSC": "0x8894E0a0c962CB723c1976a4421c95949bE2D4E3",
-                "Gate.io_BSC": "0x1C4b70a3968436B9A0a9cf5205c787eb81Bb558c",
-                "KuCoin_BSC": "0xEB2d2F1b8c558a40207669291Fda468E50c8A0bB",
-                "MEXC_BSC": "0x4982085C9e2F89F2eCb8131Eca71aFAD896e89CB",
-                "Binance_Polygon": "0xe7804c37c13166fF0b37F5aE0BB07A3aEbb6e245",
-                "OKX_Polygon": "0xAA58D356B49C909Ce69c64318E7f8f97E3E9D616",
-                "Binance_Arbitrum": "0xB38e8c17e38363aF6EbdCb3dAE12e0243582891D",
-                "OKX_Arbitrum": "0x7F268357A8c2552623316e2562D90e642bB538E5",
-                "Gate.io_Arbitrum": "0xc882b111a75c0c657fc507c04fbfcd2cc984f071",
-                "Binance_Optimism": "0xeB2629a2734e272Bcc07BDA959863f316F4bD4Cf",
-                "OKX_Optimism": "0x5C69C2c9fb09230b5195474a7d1a3Bbd3C6AAa4c",
-                "Binance_Avalanche": "0x28C6c06298d514Db089934071355E5743bf21d60",
-                "OKX_Avalanche": "0x06959153B974D0D5fDfd87D561db6d8d4FA0910b"
-            }
+            "EVM": {}
         };
 
         // 📡 ERC-20 토큰 표준 ABI
@@ -903,10 +882,41 @@
             return colors[Math.floor(Math.random() * colors.length)];
         }
 
-        // 🎯 주소 줄임 표시 함수
+        // 🎯 주소 클릭 복사 함수
+        function copyToClipboard(text, element) {
+            navigator.clipboard.writeText(text).then(() => {
+                // 복사 성공 토스트 표시
+                const tooltip = element.querySelector('.copy-tooltip');
+                if (tooltip) {
+                    tooltip.classList.add('show');
+                    setTimeout(() => {
+                        tooltip.classList.remove('show');
+                    }, 1500);
+                }
+                console.log('주소가 클립보드에 복사됨:', text);
+            }).catch(err => {
+                console.error('클립보드 복사 실패:', err);
+                // 폴백: 텍스트 선택
+                const textArea = document.createElement('textarea');
+                textArea.value = text;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                
+                const tooltip = element.querySelector('.copy-tooltip');
+                if (tooltip) {
+                    tooltip.classList.add('show');
+                    setTimeout(() => {
+                        tooltip.classList.remove('show');
+                    }, 1500);
+                }
+            });
+        }
+
+        // 🎯 주소 줄임 표시 함수 제거 - 전체 표시
         function formatAddress(address) {
-            if (!address || address.length < 10) return address;
-            return address.slice(0, 6) + '...' + address.slice(-4);
+            return address; // 전체 주소 반환
         }
 
         // 🔥 Firebase 초기화
@@ -940,13 +950,14 @@
                         wallets = firebaseWallets;
                         console.log('Firebase에서 지갑 데이터 로드됨');
                     } else {
+                        // Firebase에 데이터가 없으면 빈 구조로 시작
                         wallets = JSON.parse(JSON.stringify(defaultWallets));
-                        await saveWallets();
-                        console.log('기본 지갑 데이터를 Firebase에 저장함');
+                        console.log('Firebase에 지갑 데이터가 없음. 빈 상태로 시작');
                     }
                 } else {
+                    // Firebase 연결이 안되면 빈 구조로 시작
                     wallets = JSON.parse(JSON.stringify(defaultWallets));
-                    console.log('로컬 모드: 기본 지갑 사용');
+                    console.log('로컬 모드: 빈 지갑으로 시작');
                 }
                 
                 ensureChainWallets();
@@ -997,13 +1008,13 @@
             return mapping[chainName.toLowerCase()] || chainName;
         }
 
-        // 📁 CSV 템플릿 다운로드 (EVM 통합)
+        // 📁 CSV 템플릿 다운로드 (예시 주소로 변경)
         function downloadTemplate() {
             const csvContent = `name,address
-Binance_Hot1,0x28C6c06298d514Db089934071355E5743bf21d60
-OKX_Hot,0x98EC059Dc3aDFBdd63429454aEB0c990FBA4A128
-KuCoin_Hot,0xd6216fc19db775df9774a6e33526131da7d19a2c
-Gate.io_Hot,0x0D0707963952f2fBA59dD06f2b425ace40b492Fe`;
+Example_Exchange1,0x0000000000000000000000000000000000000001
+Example_Exchange2,0x0000000000000000000000000000000000000002
+Example_Exchange3,0x0000000000000000000000000000000000000003
+Example_Exchange4,0x0000000000000000000000000000000000000004`;
             
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement('a');
@@ -1536,8 +1547,13 @@ Gate.io_Hot,0x0D0707963952f2fBA59dD06f2b425ace40b492Fe`;
                     <td>${index + 1}</td>
                     <td>${name}</td>
                     <td class="address-cell">
-                        <span class="address-short">${formatAddress(address)}</span>
-                        <div class="address-full">${address}</div>
+                        ${address !== '주소 없음' ? 
+                            `<div class="address-clickable" onclick="copyToClipboard('${address}', this)">
+                                ${address}
+                                <div class="copy-tooltip">복사됨!</div>
+                            </div>` : 
+                            '<span style="color: #666;">주소 없음</span>'
+                        }
                     </td>
                     <td><strong>${formatNumber(balance)}</strong></td>
                     <td>
@@ -1685,7 +1701,7 @@ Gate.io_Hot,0x0D0707963952f2fBA59dD06f2b425ace40b492Fe`;
                 const item = document.createElement('div');
                 item.className = 'wallet-item';
                 item.innerHTML = `
-                    <span><span class="chain-badge" style="background: #627EEA;">EVM</span> ${name}: ${formatAddress(address)}</span>
+                    <span><span class="chain-badge" style="background: #627EEA;">EVM</span> ${name}: ${address.slice(0, 6)}...${address.slice(-4)}</span>
                     <div class="wallet-actions">
                         <button class="edit-btn" onclick="editWallet('${name}')">편집</button>
                         <button class="delete-btn" onclick="deleteWallet('${name}')">삭제</button>
