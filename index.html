@@ -1578,4 +1578,136 @@
             
             const existingWallet = findWalletByAddress(address);
             if (existingWallet) {
-                showMessage('error', `이
+                showMessage('error', `이미 등록된 주소입니다! (${existingWallet.chain} - ${existingWallet.name})`);
+                return;
+            }
+            
+            if (wallets[chain][name]) {
+                showMessage('error', `${chain} 체인에 이미 ${name} 이름이 존재합니다.`);
+                return;
+            }
+            
+            wallets[chain][name] = address;
+            
+            const saved = await saveWallets();
+            if (saved) {
+                showMessage('success', `🔥 ${chain} - ${name} 지갑이 추가되었습니다!`);
+            } else {
+                showMessage('warning', `지갑은 추가되었지만 클라우드 동기화에 실패했습니다.`);
+            }
+            
+            displayWallets();
+            
+            document.getElementById('walletName').value = '';
+            document.getElementById('walletAddress').value = '';
+        }
+
+        async function deleteWallet(chain, name) {
+            if (confirm(`${chain} - ${name} 지갑을 삭제하시겠습니까?`)) {
+                delete wallets[chain][name];
+                
+                const saved = await saveWallets();
+                if (saved) {
+                    showMessage('success', '🔥 지갑이 삭제되었습니다!');
+                } else {
+                    showMessage('warning', '지갑은 삭제되었지만 클라우드 동기화에 실패했습니다.');
+                }
+                
+                displayWallets();
+            }
+        }
+
+        function toggleWalletManager() {
+            const content = document.getElementById('walletManagerContent');
+            const icon = document.getElementById('walletToggleIcon');
+            
+            if (content && icon) {
+                content.classList.toggle('collapsed');
+                icon.classList.toggle('collapsed');
+            }
+        }
+
+        // 🚀 초기화 및 이벤트 리스너 설정
+        document.addEventListener('DOMContentLoaded', async function() {
+            console.log('🚀 DOM 로드 완료, 초기화 시작...');
+            
+            try {
+                // Firebase 초기화
+                const firebaseOk = await initializeFirebase();
+                
+                // 지갑 데이터 로드
+                await loadWallets();
+                
+                // 이벤트 리스너 설정
+                const searchBtn = document.getElementById('searchBtn');
+                const tokenInput = document.getElementById('tokenInput');
+                const addWalletBtn = document.getElementById('addWalletBtn');
+                const walletManagerHeader = document.getElementById('walletManagerHeader');
+                
+                console.log('🔧 이벤트 리스너 설정 중...');
+                
+                // 조회 버튼 클릭
+                if (searchBtn) {
+                    searchBtn.addEventListener('click', function() {
+                        console.log('검색 버튼 클릭됨!');
+                        searchToken();
+                    });
+                    console.log('✅ 검색 버튼 이벤트 리스너 설정 완료');
+                } else {
+                    console.error('❌ searchBtn 요소를 찾을 수 없음');
+                }
+                
+                // Enter 키 지원
+                if (tokenInput) {
+                    tokenInput.addEventListener('keypress', function(e) {
+                        if (e.key === 'Enter') {
+                            console.log('Enter 키 눌림!');
+                            searchToken();
+                        }
+                    });
+                    console.log('✅ 토큰 입력 Enter 키 이벤트 리스너 설정 완료');
+                } else {
+                    console.error('❌ tokenInput 요소를 찾을 수 없음');
+                }
+                
+                // 지갑 추가 버튼
+                if (addWalletBtn) {
+                    addWalletBtn.addEventListener('click', function() {
+                        console.log('지갑 추가 버튼 클릭됨!');
+                        addWallet();
+                    });
+                    console.log('✅ 지갑 추가 버튼 이벤트 리스너 설정 완료');
+                } else {
+                    console.error('❌ addWalletBtn 요소를 찾을 수 없음');
+                }
+                
+                // 지갑 관리자 토글
+                if (walletManagerHeader) {
+                    walletManagerHeader.addEventListener('click', function() {
+                        console.log('지갑 관리자 헤더 클릭됨!');
+                        toggleWalletManager();
+                    });
+                    console.log('✅ 지갑 관리자 토글 이벤트 리스너 설정 완료');
+                } else {
+                    console.error('❌ walletManagerHeader 요소를 찾을 수 없음');
+                }
+                
+                console.log('✅ 대시보드 초기화 완료!');
+                
+                // 상태 업데이트
+                const statusText = document.getElementById('statusText');
+                if (statusText) {
+                    statusText.textContent = '시스템 준비 완료! 토큰 주소를 입력하세요.';
+                }
+                
+            } catch (error) {
+                console.error('❌ 초기화 오류:', error);
+                showMessage('error', '시스템 초기화에 실패했습니다.');
+            }
+        });
+
+        // 전역 함수로도 등록 (혹시나 하는 백업용)
+        window.searchToken = searchToken;
+        window.addWallet = addWallet;
+        window.deleteWallet = deleteWallet;
+        window.toggleWalletManager = toggleWalletManager;
